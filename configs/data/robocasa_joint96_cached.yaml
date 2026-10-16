@@ -1,0 +1,34 @@
+video_size: [256, 256]
+processor:
+  num_output_cameras: 3
+sampling:
+  num_frames: 33
+  action_size: 32
+  action_video_freq_ratio: 4
+  memory_video_anchor_size: 0
+  memory_recent_frame_offset: 0
+train:
+  _target_: wam.datasets.robocasa_posttrain.RoboCasaPosttrainDataset
+  package_root: ${oc.env:ROBOCASA_PACKAGE}
+  cache_root: ${oc.env:ROBOCASA_CACHE}
+  pretrained_norm_stats: ${data.train.package_root}/norm.json
+  domain: robocasa
+  split: train
+  allow_smoke: false
+  smoke_selection: null
+  val_set_proportion: 0.01
+  processor:
+    action_output_dim: 80
+    proprio_output_dim: 80
+    num_output_cameras: 3
+val:
+  _target_: ${data.train._target_}
+  package_root: ${data.train.package_root}
+  cache_root: ${data.train.cache_root}
+  pretrained_norm_stats: ${data.train.pretrained_norm_stats}
+  domain: robocasa
+  split: val
+  allow_smoke: ${data.train.allow_smoke}
+  smoke_selection: ${data.train.smoke_selection}
+  val_set_proportion: ${data.train.val_set_proportion}
+  processor: ${data.train.processor}

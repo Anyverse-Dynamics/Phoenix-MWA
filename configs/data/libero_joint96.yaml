@@ -1,0 +1,46 @@
+defaults:
+  - libero
+  - _self_
+
+video_size: [256, 256]
+processor:
+  num_output_cameras: 3
+sampling:
+  num_frames: 33
+  action_size: 32
+  action_video_freq_ratio: 4
+  memory_video_anchor_size: 0
+  memory_recent_frame_offset: 0
+train:
+  _target_: wam.datasets.joint96_posttrain.Joint96PosttrainDataset
+  domain: libero
+  camera_slots: [0, 2]
+  dataset_dirs:
+    - ${oc.env:LIBERO_DATA_ROOT}/libero_spatial_no_noops_lerobot
+    - ${oc.env:LIBERO_DATA_ROOT}/libero_object_no_noops_lerobot
+    - ${oc.env:LIBERO_DATA_ROOT}/libero_goal_no_noops_lerobot
+    - ${oc.env:LIBERO_DATA_ROOT}/libero_10_no_noops_lerobot
+  shape_meta:
+    images:
+      - {key: image, raw_shape: [3, 512, 512], shape: [3, 256, 256]}
+      - {key: wrist_image, raw_shape: [3, 512, 512], shape: [3, 256, 256]}
+  video_size: ${data.video_size}
+  memory_video_anchor_size: 0
+  memory_recent_frame_offset: 0
+  concat_multi_camera: latent_horizontal
+  single_canvas: false
+  return_vlm_current_images: false
+  sync_vlm_color_jitter: false
+  sync_vlm_camera_jitter: false
+  image_camera_jitter: {enabled: false}
+  image_sensor_noise: {enabled: false}
+  processor:
+    train_transforms:
+      - {_target_: wam.datasets.lerobot.transforms.image.ToTensor}
+      - {_target_: torchvision.transforms.Resize, size: [256, 256]}
+    val_transforms: ${data.train.processor.train_transforms}
+  text_embedding_cache_dir: ${oc.env:LIBERO_TEXT_CACHE}
+val:
+  _target_: wam.datasets.joint96_posttrain.Joint96PosttrainDataset
+  domain: ${data.train.domain}
+  camera_slots: ${data.train.camera_slots}

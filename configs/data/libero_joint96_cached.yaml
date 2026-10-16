@@ -1,0 +1,28 @@
+defaults:
+  - libero_joint96
+  - _self_
+
+train:
+  _target_: wam.datasets.libero_joint96_cache.LiberoJoint96CachedDataset
+  image_color_jitter: {enabled: false}
+  image_camera_jitter: {enabled: false}
+  image_sensor_noise: {enabled: false}
+  sync_vlm_color_jitter: false
+  processor:
+    train_transforms:
+      - {_target_: wam.datasets.lerobot.transforms.image.ToTensor}
+      - {_target_: wam.datasets.libero_joint96_cache.CacheRGBTransform}
+    val_transforms: ${data.train.processor.train_transforms}
+  visual_cache:
+    vae_root: ${oc.env:LIBERO_WAN_VAE_CACHE}
+    stvae_root: ${oc.env:LIBERO_STVAE_CACHE}
+    source_root: ${model.joint_visual_codec.source_root}
+    source_sha256: ${model.joint_visual_codec.source_sha256}
+    initialization_checkpoint: ${init_checkpoint}
+    max_open_shards: 32
+val:
+  _target_: wam.datasets.libero_joint96_cache.LiberoJoint96CachedDataset
+  image_color_jitter: {enabled: false}
+  image_camera_jitter: {enabled: false}
+  image_sensor_noise: {enabled: false}
+  visual_cache: ${data.train.visual_cache}

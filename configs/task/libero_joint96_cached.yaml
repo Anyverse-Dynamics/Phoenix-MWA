@@ -1,0 +1,12 @@
+# @package _global_
+defaults:
+  - libero_joint96
+  - override /data: libero_joint96_cached
+  - _self_
+
+joint96_posttrain:
+  cached_visuals: true
+# The reader consumes the immutable external cache. Do not wrap it in the
+# unrelated native Phoenix-MWA CacheManager repository format.
+video_latent_cache: 'off'
+

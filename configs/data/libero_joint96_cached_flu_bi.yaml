@@ -1,0 +1,11 @@
+defaults:
+  - libero_joint96_cached
+  - _self_
+train:
+  pretrained_norm_stats: ${oc.env:LIBERO_FLU_BI_NORM_STATS,assets/stats/libero_joint96_flu_b_identity_v1.json}
+  processor:
+    action_state_transforms:
+      - _target_: wam.datasets.lerobot.transforms.libero_flu_bi.LiberoRight80FLUBIdentityTransform
+val:
+  pretrained_norm_stats: ${data.train.pretrained_norm_stats}
+  processor: ${data.train.processor}

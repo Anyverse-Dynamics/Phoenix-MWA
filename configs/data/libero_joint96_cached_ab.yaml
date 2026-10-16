@@ -1,0 +1,11 @@
+defaults:
+  - libero_joint96_cached
+  - _self_
+
+train:
+  pretrained_norm_stats: ${oc.env:LIBERO_AB_NORM_STATS,assets/stats/libero_joint96_ab_v1.json}
+  processor:
+    action_state_transforms:
+      - _target_: wam.datasets.lerobot.transforms.libero_ab.LiberoRight80ABTransform
+val:
+  pretrained_norm_stats: ${data.train.pretrained_norm_stats}
