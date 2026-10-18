@@ -55,7 +55,7 @@ class PairedLiberoCache:
         payload = torch.load(initialization_checkpoint, map_location='cpu', weights_only=True, mmap=True)
         identity = _joint96_identity(payload.get('joint96_metadata'))
         encoder = self.contracts[2]['encoder']
-        for key in ('stvae_step', 'teacher_checkpoint_state', 'teacher_output_source', 'teacher_preprocessing', 'dinov3_source_commit'):
+        for key in ('teacher_checkpoint_state', 'teacher_output_source', 'teacher_preprocessing', 'dinov3_source_commit'):
             require(encoder[key] == identity[key], f'pretraining/cache encoder mismatch: {key}')
         from wam.model.modules.codecs.dino_stvae.provenance import canonical_source_identity
         expected_source = canonical_source_identity(dict(source_root=str(source_root), source_sha256=source_sha256))

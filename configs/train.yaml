@@ -52,7 +52,7 @@ paths:
   output: ${oc.env:WAM_OUTPUT_ROOT,runs}
   robotwin: ${oc.env:ROBOTWIN_DATA_ROOT,${paths.data}/robotwin}
   robodojo: ${oc.env:ROBODOJO_DATA_ROOT,${paths.data}/robodojo}
-  libero: ${oc.env:LIBERO_DATA_ROOT,${paths.data}/libero}
+  libero: ${oc.env:LIBERO_DATA_ROOT,${paths.data}/libero_mujoco3.3.2}
   ebench: ${oc.env:EBENCH_DATA_ROOT,${paths.data}/ebench}
 save_on_train_end: true
 save_training_state: true

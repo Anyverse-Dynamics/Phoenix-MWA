@@ -24,20 +24,18 @@ def compose_recipe(task, overrides=()):
     validate_training_config(cfg)
     return cfg
 
-def inspect_checkpoint(path, expected_step):
+def inspect_checkpoint(path, expected_step=None):
     path = Path(str(path))
     if not path.is_absolute() or not path.is_file():
         raise ValueError('Expected an absolute weights file, not a full-state directory')
     payload = torch.load(path, map_location='cpu', mmap=True, weights_only=True)
-    if type(payload.get('step')) is not int or payload['step'] != int(expected_step):
-        raise ValueError(f"Checkpoint step {payload.get('step')} != {expected_step}")
     identity = _joint96_identity(payload.get('joint96_metadata'))
     attention = identity['action_video_attention']
     if attention != JOINT96_ACTION_VIDEO_ATTENTION:
         raise ValueError(f'Joint96 action_video_attention mismatch: checkpoint={attention!r}, model={JOINT96_ACTION_VIDEO_ATTENTION!r}')
     if (identity['action_dim'], identity['proprio_dim'], identity['channel_order'], identity['camera_order']) != (80, 80, ['wan_vae48', 'stvae48'], ['main', 'left', 'right']):
         raise ValueError('Checkpoint is not the canonical80 three-slot Joint96 interface')
-    return {'path': str(path), 'step': payload['step'], 'bytes': path.stat().st_size, 'action_video_attention': attention, 'identity': identity, 'tensors': {key: len(payload[key]) for key in ('mot', 'proprio_encoder', 'action_proprio_encoder') if key in payload}}
+    return {'path': str(path), 'step': payload.get('step'), 'bytes': path.stat().st_size, 'action_video_attention': attention, 'identity': identity, 'tensors': {key: len(payload[key]) for key in ('mot', 'proprio_encoder', 'action_proprio_encoder') if key in payload}}
 
 def check_resources(cfg):
     from wam.datasets.lerobot.robot_video_dataset import DEFAULT_PROMPT

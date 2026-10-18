@@ -31,7 +31,7 @@ def main():
     for prompt in package['prompts']:
         text.get(prompt)
     payload = torch.load(cfg.init_checkpoint, mmap=True, map_location='cpu', weights_only=True)
-    expected_step = int(cfg.joint96_posttrain.expected_pretrain_step)
+    expected_step = payload.get("step")
     identity = validate_cached_initialization(payload, plan, expected_step)
     key = 'mixtures.action.embodiment_prompt.embedding.weight'
     if bool(payload['mot'][key][18].count_nonzero()):

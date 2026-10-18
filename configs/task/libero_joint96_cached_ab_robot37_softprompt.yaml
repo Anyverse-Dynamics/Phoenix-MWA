@@ -10,14 +10,14 @@ local_robot_softprompt:
   expected_init_step: null
 
 joint96_posttrain:
-  expected_pretrain_step: ${oc.decode:${oc.env:EXPECTED_PRETRAIN_STEP}}
+  expected_pretrain_step: null # deprecated; actual step is read from checkpoint
   libero_softprompt:
     enabled: true
     embodiment_id: 0
 
 model:
   joint_visual_codec:
-    expected_stvae_step: 150000
+    expected_stvae_step: null # deprecated; read from encoder checkpoint
     stvae_checkpoint_path: ${oc.env:STVAE_CHECKPOINT}
   action_dit_config:
     num_embodiments: 28

@@ -22,7 +22,7 @@ def checkpoint_sha256(path: str | Path) -> str:
     Path(path).expanduser().resolve(strict=True)
     return None
 
-def load_stvae_checkpoint(path: str | Path, expected_step: int=90000) -> tuple[STVAE, dict[str, Any]]:
+def load_stvae_checkpoint(path: str | Path, expected_step: int | None=None) -> tuple[STVAE, dict[str, Any]]:
     """Strictly load a model-only or training STVAE checkpoint on CPU.
 
     Training checkpoints contain NumPy's MT19937 RNG array. Only its inspected
@@ -41,8 +41,7 @@ def load_stvae_checkpoint(path: str | Path, expected_step: int=90000) -> tuple[S
         raise ValueError('STVAE checkpoint must contain a dictionary')
     if payload.get('model_type') != MODEL_TYPE or payload.get('format_version') != FORMAT_VERSION:
         raise ValueError('Not a supported STVAE checkpoint; spatial SVAE/Wan VAE are incompatible')
-    if payload.get('step') != expected_step:
-        raise ValueError(f"STVAE step mismatch: expected {expected_step}, got {payload.get('step')}")
+    # expected_step is accepted for old configs only; progress is not architecture.
     config = payload.get('model_config')
     if not isinstance(config, dict) or set(config) != _CONFIG_KEYS:
         raise ValueError('STVAE checkpoint model_config keys do not match the architecture')
@@ -63,7 +62,7 @@ def load_stvae_checkpoint(path: str | Path, expected_step: int=90000) -> tuple[S
     if not isinstance(provenance, dict):
         raise ValueError('Missing STVAE teacher provenance')
     teacher_digest = provenance.get('teacher_sha256')
-    metadata = {'stvae_checkpoint_path': str(checkpoint_path), 'stvae_checkpoint_sha256': digest, 'stvae_step': int(payload['step']), 'model_type': MODEL_TYPE, 'format_version': FORMAT_VERSION, 'model_config': dict(config), 'teacher_checkpoint_recorded': provenance.get('teacher_checkpoint'), 'teacher_sha256': teacher_digest, 'checkpoint_provenance': provenance, 'calibration': payload.get('calibration'), 'posterior': 'mean', 'extra_latent_scaling': 'none', 'input_normalization': 'checkpoint_input_mean_std_fp32', 'input_stats': {name: {'channels': int(value.numel()), 'min': float(value.min()), 'max': float(value.max())} for name, value in (('mean', model.input_mean), ('std', model.input_std))}}
+    metadata = {'stvae_checkpoint_path': str(checkpoint_path), 'stvae_checkpoint_sha256': digest, 'stvae_step': payload.get('step'), 'model_type': MODEL_TYPE, 'format_version': FORMAT_VERSION, 'model_config': dict(config), 'teacher_checkpoint_recorded': provenance.get('teacher_checkpoint'), 'teacher_sha256': teacher_digest, 'checkpoint_provenance': provenance, 'calibration': payload.get('calibration'), 'posterior': 'mean', 'extra_latent_scaling': 'none', 'input_normalization': 'checkpoint_input_mean_std_fp32', 'input_stats': {name: {'channels': int(value.numel()), 'min': float(value.min()), 'max': float(value.max())} for name, value in (('mean', model.input_mean), ('std', model.input_std))}}
     return (model, metadata)
 
 class OnlineDinov3STVAEEncoder(nn.Module):
@@ -72,7 +71,7 @@ class OnlineDinov3STVAEEncoder(nn.Module):
     temporal_compression_factor = 4
     embed_dim = 48
 
-    def __init__(self, dino_kwargs: dict[str, Any], stvae_checkpoint_path: str, expected_stvae_step: int=90000):
+    def __init__(self, dino_kwargs: dict[str, Any], stvae_checkpoint_path: str, expected_stvae_step: int | None=None):
         super().__init__()
         kwargs = dict(dino_kwargs)
         kwargs['verify_source_commit'] = False

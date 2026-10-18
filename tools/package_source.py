@@ -7,7 +7,7 @@ import tarfile
 from audit_public_source import inspect
 
 ROOT = Path(__file__).resolve().parents[1]
-DIRS = ('src', 'configs', 'scripts', 'eval', 'tools', 'tests', 'assets',
+DIRS = ('src', 'configs', 'scripts', 'eval', 'tools', 'assets',
         'third_party', 'LICENSES', 'docs')
 FILES = ('pyproject.toml', 'README.md', 'LICENSE', 'NOTICE', '.gitignore')
 

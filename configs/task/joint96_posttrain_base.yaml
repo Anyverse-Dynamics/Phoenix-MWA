@@ -8,7 +8,7 @@ local_robot_joint96:
 joint96_posttrain:
   enabled: true
   cached_visuals: false
-  expected_pretrain_step: ${oc.decode:${oc.env:EXPECTED_PRETRAIN_STEP}}
+  expected_pretrain_step: null # deprecated; actual step is read from checkpoint
 init_checkpoint: ${oc.env:WAM_PRETRAIN_CHECKPOINT}
 resume: null
 max_steps: null

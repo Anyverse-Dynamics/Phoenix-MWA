@@ -97,7 +97,7 @@ model:
     source_root: bundled://dino-stvae-v1
     source_sha256: null
     stvae_checkpoint_path: ${oc.env:STVAE_CHECKPOINT}
-    expected_stvae_step: 100000
+    expected_stvae_step: null # deprecated; read from encoder checkpoint
     dino_kwargs:
       checkpoint_path: ${oc.env:DINO_ENCODER_CHECKPOINT}
       checkpoint_state: ema_student
@@ -107,8 +107,8 @@ model:
       projector_state_path: null
       feature_norm_state_path: null
       require_feature_norm: false
-      starvla_source_path: ${model.joint_visual_codec.source_root}/third_party/dino90k_runtime
-      dinov3_source_path: ${model.joint_visual_codec.source_root}/third_party/dino90k_runtime/dinov3
+      starvla_source_path: ${model.joint_visual_codec.source_root}/third_party/dino_runtime
+      dinov3_source_path: ${model.joint_visual_codec.source_root}/third_party/dino_runtime/dinov3
       dinov3_source_commit: 6876159a11b4df116f30f667f8c9888617df0751
       verify_source_commit: true
       strict_load: true

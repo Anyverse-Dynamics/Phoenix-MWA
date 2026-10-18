@@ -30,8 +30,8 @@ def main():
         'model.joint_visual_codec.source_sha256': verify_bundle()['source_sha256'],
         'model.joint_visual_codec.stvae_checkpoint_path': os.environ['STVAE_CHECKPOINT'],
         'model.joint_visual_codec.dino_kwargs.checkpoint_path': os.environ['DINO_ENCODER_CHECKPOINT'],
-        'model.joint_visual_codec.dino_kwargs.starvla_source_path': 'bundled://dino-stvae-v1/third_party/dino90k_runtime',
-        'model.joint_visual_codec.dino_kwargs.dinov3_source_path': 'bundled://dino-stvae-v1/third_party/dino90k_runtime/dinov3',
+        'model.joint_visual_codec.dino_kwargs.starvla_source_path': 'bundled://dino-stvae-v1/third_party/dino_runtime',
+        'model.joint_visual_codec.dino_kwargs.dinov3_source_path': 'bundled://dino-stvae-v1/third_party/dino_runtime/dinov3',
     }
     for split in ('train', 'val'):
         paths.update({f'data.{split}.package_root': os.environ['ROBOCASA_PACKAGE'],

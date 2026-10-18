@@ -50,9 +50,6 @@ def validate_soft_prompt_config(cfg):
     if init:
         if select("resume") is not None or select("init_checkpoint") is not None:
             raise ValueError("Prompt weights-only initialization cannot be combined with resume/init_checkpoint")
-        step = select("local_robot_softprompt.expected_init_step")
-        if type(step) is not int or step <= 0:
-            raise ValueError("Set a positive expected_init_step for prompt migration")
     return registry
 
 

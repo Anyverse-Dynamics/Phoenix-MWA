@@ -1,6 +1,5 @@
 """Online RGB augmentation with strict clean selection and native joint14 labels."""
 import json
-import hashlib
 from pathlib import Path
 import torch
 from .joint96_posttrain import Joint96PosttrainDataset
@@ -8,12 +7,6 @@ from .lerobot.domain_aug_dataset import DomainAugmentedRobotVideoDataset, sample
 from .lerobot.robot_video_dataset import DEFAULT_PROMPT
 from .robotwin_joint96_io import BoundedJoint96RGB, official_text_padding
 from .text_embedding_cache import TaskIndexShardedTextEmbeddingCache
-
-def file_hash(path):
-    h=hashlib.sha256()
-    with Path(path).open('rb') as f:
-        for b in iter(lambda:f.read(8<<20),b''):h.update(b)
-    return h.hexdigest()
 
 def clean_metadata(root):
     root=Path(root);info=json.loads((root/'meta/info.json').read_text())
@@ -55,9 +48,8 @@ class RobotwinJoint96OnlineDataset(BoundedJoint96RGB,DomainAugmentedRobotVideoDa
             bank=TaskIndexShardedTextEmbeddingCache(self.text_embedding_cache_dir,expected_context_len=128)
             if bank.embedding_dim!=4096 or bank.manifest['prompt_template']!=DEFAULT_PROMPT:
                 raise ValueError('T5 template/width mismatch')
-            hashes=bank.manifest['tasks_sha256']
-            if file_hash(Path(self.dataset_dirs[0])/'meta/tasks.jsonl') not in ([hashes] if isinstance(hashes,str) else hashes):
-                raise ValueError('T5 task identities mismatch')
+            # get() validates the actual task prompt against its indexed cache.
+            # Do not require a fingerprint of the dataset metadata file.
             self._text_cache=bank
         prefix=DEFAULT_PROMPT.split('{task}')[0]
         if not prompt.startswith(prefix):raise ValueError('Unexpected T5 prompt')

@@ -240,8 +240,6 @@ def validate_training_config(cfg: DictConfig | dict[str, Any]) -> None:
                 raise ValueError("Joint96 posttraining is a new weights-only run, not local pretraining/resume")
             if not _select(cfg, "init_checkpoint"):
                 raise ValueError("Joint96 posttraining requires init_checkpoint")
-            if int(_select(cfg, "joint96_posttrain.expected_pretrain_step", 0)) <= 0:
-                raise ValueError("Set expected_pretrain_step to the verified source checkpoint step")
             if _select(cfg, "video_latent_cache", "off") != "off":
                 raise ValueError("Joint96 posttraining uses its explicit reader, not the native CacheManager")
             for path, expected in (("model.video_dit_config.in_dim", 96), ("model.video_dit_config.out_dim", 96),

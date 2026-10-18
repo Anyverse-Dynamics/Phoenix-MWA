@@ -136,11 +136,9 @@ def prepare(args):
         print(f'[prepare] hashing {name}: {path}', flush=True)
         resources[name] = {'path': path, **file_identity(path), 'sha256': file_hash(path)}
     payload = torch.load(resources['policy']['path'], map_location='cpu', mmap=True, weights_only=True)
-    require(payload.get('step') == 72500, 'Expected Robot37 step 72500')
     identity = _joint96_identity(payload['joint96_metadata'])
     require(identity['action_dim'] == identity['proprio_dim'] == 80, 'Expected canonical80 policy')
     require(identity['channel_order'] == ['wan_vae48', 'stvae48'], 'Unexpected visual channel order')
-    require(identity['stvae_step'] == 150000, 'Expected STVAE150k policy')
     source_root = str(Path(args.source_root).resolve(strict=True))
     data_root = Path(args.data_root).resolve(strict=True)
     tasks = sorted(data_root.glob('gr1_unified.*'))
@@ -233,7 +231,7 @@ class CacheEncoder:
             require(file_identity(resource['path']) == {k: resource[k] for k in ('size', 'mtime_ns')}, f"Checkpoint changed since prepare: {resource['path']}")
         self.vae = _load_registered_model(r['vae']['path'], 'wan_video_vae', torch_dtype=torch.bfloat16, device=str(self.device))
         source = plan['source_root']
-        cfg = {'source_root': source, 'source_sha256': plan['source_sha256'], 'stvae_checkpoint_path': r['stvae']['path'], 'expected_stvae_step': 150000, 'dino_kwargs': {'checkpoint_path': r['dino']['path'], 'checkpoint_state': 'ema_student', 'output_source': 'backbone', 'projection_mode': 'raw', 'projector_out_dim': 1024, 'starvla_source_path': source + '/third_party/dino90k_runtime', 'dinov3_source_path': source + '/third_party/dino90k_runtime/dinov3', 'dinov3_source_commit': plan['encoder_identity']['dinov3_source_commit'], 'verify_source_commit': True, 'strict_load': True, 'image_size': 256, 'patch_size': 16}}
+        cfg = {'source_root': source, 'source_sha256': plan['source_sha256'], 'stvae_checkpoint_path': r['stvae']['path'], 'expected_stvae_step': 150000, 'dino_kwargs': {'checkpoint_path': r['dino']['path'], 'checkpoint_state': 'ema_student', 'output_source': 'backbone', 'projection_mode': 'raw', 'projector_out_dim': 1024, 'starvla_source_path': source + '/third_party/dino_runtime', 'dinov3_source_path': source + '/third_party/dino_runtime/dinov3', 'dinov3_source_commit': plan['encoder_identity']['dinov3_source_commit'], 'verify_source_commit': True, 'strict_load': True, 'image_size': 256, 'patch_size': 16}}
         self.encoder = JointVisualEncoder.from_config(cfg, vae=self.vae, device=self.device)
         self.pad = torch.tensor([[False, True, True]], device=self.device)
         self.runtime = {'torch': str(torch.__version__), 'cuda': torch.version.cuda, 'device': torch.cuda.get_device_name(self.device), 'encoder': 'JointVisualEncoder.encode', 'camera_slots': 3, 'window_batch_size': 1, 'visual_attention_backend': 'math_sdpa'}

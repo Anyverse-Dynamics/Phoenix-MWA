@@ -14,18 +14,37 @@ import traceback
 RUNNER_MODULE = 'eval.libero_plus.runner'
 SMOKE_SUITES = ('libero_goal', 'libero_object', 'libero_spatial', 'libero_10')
 
-def evaluation_checkpoint_path(resource_dir, step, filename=None):
+def evaluation_checkpoint_path(resource_dir, step=None, filename=None):
     """Allow a release filename while keeping the checkpoint inside its bundle."""
     if filename is None:
-        filename = f'step_{step:06d}.pt'
+        root = Path(resource_dir)
+        if (root / 'policy.pt').is_file():
+            filename = 'policy.pt'
+        else:
+            candidates = sorted(root.glob('*.pt'))
+            if len(candidates) == 1:
+                filename = candidates[0].name
+            else:
+                raise ValueError('Set JOINT96_EVAL_CHECKPOINT_FILENAME when no unique policy file exists')
     if not filename or filename in ('.', '..') or '\x00' in filename or ('/' in filename) or ('\\' in filename) or (Path(filename).name != filename):
         raise ValueError('JOINT96_EVAL_CHECKPOINT_FILENAME must be a single filename')
     return Path(resource_dir) / filename
 ROOT = Path(__file__).resolve().parents[2]
 INCOMING = Path(os.environ.get('JOINT96_EVAL_RESOURCE_DIR', '/unset'))
-EVAL_STEP = int(os.environ.get('JOINT96_EVAL_STEP', '0'))
-PRETRAIN_STEP = int(os.environ.get('EVAL_PRETRAIN_STEP', '0'))
-EVAL_CKPT = evaluation_checkpoint_path(INCOMING, EVAL_STEP, os.environ.get('JOINT96_EVAL_CHECKPOINT_FILENAME'))
+EVAL_STEP = None
+PRETRAIN_STEP = None
+EVAL_CKPT = None
+
+
+def read_checkpoint_progress():
+    global EVAL_CKPT, EVAL_STEP, PRETRAIN_STEP
+    import torch
+    from wam.utils.checkpoint_steps import checkpoint_steps
+    EVAL_CKPT = evaluation_checkpoint_path(INCOMING, filename=os.environ.get('JOINT96_EVAL_CHECKPOINT_FILENAME'))
+    payload = torch.load(EVAL_CKPT, map_location='cpu', mmap=True, weights_only=True)
+    progress = checkpoint_steps(payload)
+    EVAL_STEP, PRETRAIN_STEP = progress['step'], progress['pretrain_step']
+    return progress
 PLUS = ROOT / 'third_party/LIBERO-plus'
 sys.path[:0] = [str(ROOT / 'src'), str(ROOT), str(PLUS)]
 os.environ.setdefault('WAM_LIBERO_REPO_ROOT', str(PLUS))
@@ -160,14 +179,12 @@ def preflight(output, *, smoke=False):
     from wam.model.modules.codecs.dino_stvae.provenance import verify_bundle, canonical_source_identity, BUNDLED_SOURCE
     from wam.model.modules.conditioning.frame_attention import JOINT96_ACTION_VIDEO_ATTENTION
     cfg = train_cfg()
-    if PRETRAIN_STEP <= 0 or EVAL_STEP <= 0:
-        raise ValueError('Set EVAL_PRETRAIN_STEP and JOINT96_EVAL_STEP explicitly')
+    read_checkpoint_progress()
     import mujoco
     assert mujoco.__version__ == '3.3.2'
     from wand.api import library
     assert library.MagickMotionBlurImage is not None
     expected_sha = None
-    assert json.loads((INCOMING / 'initialization.json').read_text())['pretrain_step'] == PRETRAIN_STEP
     from wam.datasets.lerobot.transforms.libero_flu_bi import LIBERO_FLU_BI_CONTRACT
     assert cfg.joint96_posttrain.libero_frame_contract == LIBERO_FLU_BI_CONTRACT['version']
     for split in ('train', 'val'):
@@ -177,13 +194,10 @@ def preflight(output, *, smoke=False):
     p = torch.load(EVAL_CKPT, mmap=True, weights_only=True, map_location='cpu')
     from wam.posttrain.eval_contract import validate_evaluation_contract
     validate_evaluation_contract(cfg, p, INCOMING / 'dataset_stats.json', expected_pretrain_step=PRETRAIN_STEP)
-    assert p['step'] == EVAL_STEP
     assert p['mot']['mixtures.action.action_encoder.weight'].shape == (1024, 80)
     assert p['mot']['mixtures.video.patch_embedding.weight'].shape == (3072, 96, 1, 2, 2)
     assert p['joint96_metadata']['action_video_attention'] == JOINT96_ACTION_VIDEO_ATTENTION == 'current_and_noisy_future_v1'
     identity = _joint96_identity(p['joint96_metadata'])
-    assert identity['stvae_step'] == 150000
-    assert cfg.joint96_posttrain.expected_pretrain_step == PRETRAIN_STEP
     assert 'current_conditioning' not in identity, 'This release preserves the legacy single-current-frame evaluation'
     assert cfg.joint96_posttrain.libero_softprompt.embodiment_id == 0
     assert cfg.local_robot_softprompt.enabled
@@ -543,8 +557,8 @@ def main():
     if args.phase != 'summary':
         from eval.libero.bootstrap import setup_libero_paths
         setup_libero_paths()
-    if args.phase != 'summary' and (EVAL_STEP <= 0 or PRETRAIN_STEP <= 0):
-        raise ValueError('Explicit pretraining and posttraining steps are required')
+    if args.phase != 'summary':
+        read_checkpoint_progress()
     if args.phase in ('smoke', 'balanced10', 'full'):
         if (args.output / 'launch.json').exists():
             raise FileExistsError('Use a new output directory')

@@ -20,25 +20,21 @@ def inspect_inputs(cfg=None):
     path = Path(cfg.init_checkpoint if cfg is not None else os.environ["WAM_PRETRAIN_CHECKPOINT"])
     payload = torch.load(path, map_location="cpu", mmap=True, weights_only=True)
     identity = _joint96_identity(payload["joint96_metadata"])
-    step = int(cfg.joint96_posttrain.expected_pretrain_step if cfg is not None else os.environ["EXPECTED_PRETRAIN_STEP"])
-    if step <= 0:
-        raise ValueError("Expected pretraining step must be positive")
-    if payload.get("step") != step:
-        raise ValueError("Checkpoint step mismatch")
+    step = payload.get("step")
     registry = EmbodimentRegistry(cfg.local_robot_softprompt.registry_path if cfg is not None else os.environ.get("EMBODIMENT_REGISTRY", str(ROOT / "configs/embodiment_registry/local_robot37_arm18_capacity28_v1.json")))
     prompt = identity.get("soft_prompt", {})
     key = "mixtures.action.embodiment_prompt.embedding.weight"
     if (prompt.get('num_embodiments') != 28 or prompt.get('num_tokens') != 8 or prompt.get('context_dim') != 1024 or (tuple(payload['mot'][key].shape) != (28, 8192)) or (not torch.isfinite(payload['mot'][key]).all()) or (registry.content['embodiments'][0] != 'franka_panda')):
         raise ValueError("Pretrained Robot37/Panda soft prompt mismatch")
-    if identity["stvae_step"] != 150000 or identity["action_video_attention"] != "current_and_noisy_future_v1":
-        raise ValueError("Expected STVAE150k and current/noisy-future attention")
+    if identity["action_video_attention"] != "current_and_noisy_future_v1":
+        raise ValueError("Expected current/noisy-future attention")
     encoders = (cfg.model.joint_visual_codec.stvae_checkpoint_path,
                 cfg.model.joint_visual_codec.dino_kwargs.checkpoint_path) if cfg is not None else (
                 os.environ['STVAE_CHECKPOINT'], os.environ['DINO_ENCODER_CHECKPOINT'])
     for path_value in encoders:
         if not Path(path_value).is_file():
             raise FileNotFoundError(path_value)
-    return {"checkpoint": str(path), "pretrain_step": step, "stvae_step": 150000,
+    return {"checkpoint": str(path), "pretrain_step": step, "stvae_step": identity.get("stvae_step"),
         "embodiment_id": 0, "embodiment_name": "franka_panda", "registry_sha256": registry.sha256,
         "prompt_shape": [28, 8, 1024], "gpu_smoke": False}
 

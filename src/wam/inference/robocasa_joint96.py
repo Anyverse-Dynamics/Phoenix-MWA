@@ -6,12 +6,14 @@ from hydra.utils import instantiate
 from omegaconf import OmegaConf
 
 from wam.datasets.robocasa_delta import CONTRACT, masks, project, decode, observation_state, prompt_for, RoboCasaNormalizer
-from wam.datasets.robocasa_posttrain import load_package, RoboCasaTextCache, action_space_module, package_space
-from wam.datasets.robocasa_visual_cache import read_json, require, file_hash
+from wam.datasets.robocasa_posttrain import action_space_module, package_space
+from wam.datasets.robocasa_visual_cache import read_json, require
 from wam.training.checkpoint import load_joint96_initialization
 from wam.utils.config_resolvers import register_default_resolvers
 from .frame_joint import infer_frame_joint_window
 from .robocasa_text import RoboCasaInferenceText
+from .robocasa_normalization import resolve_normalization_stats
+from .robocasa_resources import DEFAULT_PACKAGE, ROOT, load_inference_package
 
 
 def instantiate_checkpoint_model(model_config, device):
@@ -32,16 +34,12 @@ def instantiate_checkpoint_model(model_config, device):
         factory.load_wan22_ti2v_5b_components = original_loader
 
 
-def validate_checkpoint(payload, package, root, *, expected_pretrain_step=72500):
+def validate_checkpoint(payload, package, root=None, *, expected_pretrain_step=None):
     saved = payload.get("joint96_metadata", {}).get("soft_prompt", {}).get("training_contract", {})
     contract = package.get("contract", CONTRACT)
     expected = {"domain": "robocasa", "frame_contract": contract, "embodiment_id": contract["embodiment_id"],
-                "package_sha256": package["sha256"], "normalization_sha256": package["norm_sha256"],
-                "visual_plan_sha256": package["plan_sha256"], "visual_attention_backend": "math_sdpa",
-                "pretrain_step": expected_pretrain_step, "text_manifest_sha256": file_hash(Path(root) / "text/COMPLETE.json")}
+                "visual_attention_backend": "math_sdpa"}
     for key, value in expected.items():
-        if 'sha256' in key:
-            continue
         require(saved.get(key) == value, f"RoboCasa checkpoint provenance mismatch: {key}")
 
 
@@ -58,7 +56,7 @@ class RoboCasaJoint96Policy:
         self.reset()
 
     @classmethod
-    def from_checkpoint(cls, checkpoint, config, package_root, *, device="cuda:0", allow_smoke=False, **kwargs):
+    def from_checkpoint(cls, checkpoint, config, package_root=DEFAULT_PACKAGE, *, device="cuda:0", allow_smoke=False, **kwargs):
         register_default_resolvers()
         cfg = OmegaConf.load(config)
         from wam.posttrain.guard import install_import_guard, validate_scope
@@ -66,25 +64,40 @@ class RoboCasaJoint96Policy:
         validate_scope(cfg)
         from wam.training.robocasa_posttrain import validate_robocasa_config
         validate_robocasa_config(cfg)
-        package = load_package(package_root, allow_smoke=allow_smoke)
+        package = load_inference_package(package_root, allow_smoke=allow_smoke)
         space = package_space(package)
         require(cfg.joint96_posttrain.robocasa.frame_contract == space.CONTRACT["version"],
                 "Inference config/package action space mismatch")
+        stats_path = resolve_normalization_stats(cfg)
+        # Validate the source statistics before constructing the expensive model.
+        normalizer = space.RoboCasaNormalizer(read_json(stats_path))
         payload = torch.load(checkpoint, map_location="cpu", mmap=True, weights_only=True)
         saved_contract = payload.get('joint96_metadata', {}).get('soft_prompt', {}).get('training_contract', {})
         if saved_contract.get('smoke_selection_sha256') and not allow_smoke:
             raise ValueError('Smoke checkpoint requires explicit allow_smoke; not a formal result')
         validate_checkpoint(payload, package, package_root,
-                            expected_pretrain_step=int(cfg.joint96_posttrain.expected_pretrain_step))
-        step = payload["step"]
+                            expected_pretrain_step=None)
+        from wam.utils.checkpoint_steps import checkpoint_steps
+        progress = checkpoint_steps(payload)
+        step = progress['step']
         del payload
         model = instantiate_checkpoint_model(cfg.model, device)
         load_joint96_initialization(model, str(Path(checkpoint).resolve()), expected_step=step)
         model.set_runtime_device(device)
         model.eval()
-        text = RoboCasaInferenceText(RoboCasaTextCache(package_root, package), cfg.model, device)
-        return cls(model, space.RoboCasaNormalizer(read_json(Path(package_root) / "norm.json")),
-                   text, action_space=package.get("action_space", "delta80"), **kwargs)
+        cache_dir = OmegaConf.select(cfg, 'inference.text_cache_dir', default='.cache/robocasa_t5')
+        if cache_dir is not None:
+            cache_dir = Path(cache_dir).expanduser()
+            if not cache_dir.is_absolute():
+                cache_dir = ROOT / cache_dir
+        text = RoboCasaInferenceText(None, cfg.model, device, cache_dir=cache_dir)
+        policy = cls(model, normalizer,
+                     text, action_space=package.get("action_space", "delta80"), **kwargs)
+        policy.checkpoint_progress = progress
+        policy.normalization_stats_path = str(stats_path)
+        print('ROBOCASA_NORMALIZATION_STATS', str(stats_path), flush=True)
+        print('ROBOCASA_CHECKPOINT_PROGRESS', progress, flush=True)
+        return policy
 
     def reset(self, task_description=None):
         self.replans = 0

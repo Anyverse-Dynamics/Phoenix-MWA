@@ -1,0 +1,235 @@
+--- a/description/utils/generate_episode_instructions.py
++++ b/description/utils/generate_episode_instructions.py
+@@ -15,14 +15,16 @@
+     placeholders = re.findall(r"{([^}]+)}", instruction)
+     return placeholders
+ 
+-def filter_instructions(instructions: List[str], episode_params: Dict[str, str]) -> List[str]:
++def filter_instructions(instructions: List[str], episode_params: Dict[str, str], rng=None) -> List[str]:
+     """
+     Filter instructions to only include those that have all placeholders
+     matching the available episode parameters. No more, no less.
+     Also accept instructions that don't contain arm placeholder {[a-z]}.
+     """
++    rng = random if rng is None else rng
+     filtered_instructions = []
+-    random.shuffle(instructions)
++    instructions = list(instructions)
++    rng.shuffle(instructions)
+ 
+     for instruction in instructions:
+         placeholders = extract_placeholders(instruction)
+@@ -43,12 +45,13 @@
+     return filtered_instructions
+ 
+ 
+-def replace_placeholders(instruction: str, episode_params: Dict[str, str]) -> str:
++def replace_placeholders(instruction: str, episode_params: Dict[str, str], rng=None) -> str:
+     """Replace all {X} placeholders in the instruction with corresponding values from episode_params.
+     For arm placeholders {[a-z]}, add 'the ' in front and ' arm' after the value.
+     If the value is a path to an existing JSON file, randomly choose one 'description' item and prepend 'the'.
+     If the value contains '\' or '/' but the file does not exist, print a bold warning.
+     """
++    rng = random if rng is None else rng
+     # Remove {} from episode_params keys for replacement
+     stripped_episode_params = {key.strip("{}"): value for key, value in episode_params.items()}
+ 
+@@ -70,7 +73,7 @@
+             with open(json_path, "r") as f:
+                 json_data = json.load(f)
+             # Randomly choose one description and prepend 'the'
+-            description = random.choice(json_data.get("seen", []))
++            description = rng.choice(json_data.get("seen", []))
+             value = f"the {description}"
+         # Check if the key is a single lowercase letter (arm placeholder)
+         elif len(key) == 1 and "a" <= key <= "z":
+@@ -83,12 +86,13 @@
+     return instruction
+ 
+ 
+-def replace_placeholders_unseen(instruction: str, episode_params: Dict[str, str]) -> str:
++def replace_placeholders_unseen(instruction: str, episode_params: Dict[str, str], rng=None) -> str:
+     """Similar to replace_placeholders but uses 'unseen' descriptions from JSON files.
+     For arm placeholders {[a-z]}, add 'the ' in front and ' arm' after the value.
+     If the value is a path to an existing JSON file, randomly choose one 'unseen' description and prepend 'the'.
+     If the value contains '\' or '/' but the file does not exist, print a bold warning.
+     """
++    rng = random if rng is None else rng
+     # Remove {} from episode_params keys for replacement
+     stripped_episode_params = {key.strip("{}"): value for key, value in episode_params.items()}
+ 
+@@ -111,11 +115,11 @@
+                 json_data = json.load(f)
+             # Randomly choose one unseen description and prepend 'the'
+             if "unseen" in json_data and json_data["unseen"]:
+-                description = random.choice(json_data.get("unseen", []))
++                description = rng.choice(json_data.get("unseen", []))
+                 value = f"the {description}"
+             else:
+                 # Fall back to seen descriptions if unseen is empty
+-                description = random.choice(json_data.get("seen", []))
++                description = rng.choice(json_data.get("seen", []))
+                 value = f"the {description}"
+         # Check if the key is a single lowercase letter (arm placeholder)
+         elif len(key) == 1 and "a" <= key <= "z":
+@@ -181,7 +185,7 @@
+                 indent=2,
+             )
+ 
+-def generate_episode_descriptions(task_name: str, episodes: List[Dict[str, str]], max_descriptions: int = 1000000):
++def generate_episode_descriptions(task_name: str, episodes: List[Dict[str, str]], max_descriptions: int = 1000000, seed=None):
+     """
+     Generate descriptions for episodes by replacing placeholders in instructions with parameter values.
+     For each episode, filter instructions that have matching placeholders and generate up to
+@@ -198,9 +202,10 @@
+ 
+     # Process each episode
+     for i, episode in enumerate(episodes):
++        rng = random if seed is None else random.Random(f"{seed}:{i}")
+         # Filter instructions that have all placeholders matching episode parameters
+-        filtered_seen_instructions = filter_instructions(seen_instructions, episode)
+-        filtered_unseen_instructions = filter_instructions(unseen_instructions, episode)
++        filtered_seen_instructions = filter_instructions(seen_instructions, episode, rng=rng)
++        filtered_unseen_instructions = filter_instructions(unseen_instructions, episode, rng=rng)
+ 
+         if filtered_seen_instructions == [] and filtered_unseen_instructions == []:
+             print(f"Episode {i}: No valid instructions found")
+@@ -215,7 +220,7 @@
+                 if len(seen_episode_descriptions) >= max_descriptions:
+                     flag_seen = False
+                     break
+-                description = replace_placeholders(instruction, episode)
++                description = replace_placeholders(instruction, episode, rng=rng)
+                 seen_episode_descriptions.append(description)
+ 
+         # Generate unseen descriptions by replacing placeholders
+@@ -226,7 +231,7 @@
+                 if len(unseen_episode_descriptions) >= max_descriptions:
+                     flag_unseen = False
+                     break
+-                description = replace_placeholders_unseen(instruction, episode)
++                description = replace_placeholders_unseen(instruction, episode, rng=rng)
+                 unseen_episode_descriptions.append(description)
+ 
+         all_generated_descriptions.append({
+--- a/envs/_base_task.py
++++ b/envs/_base_task.py
+@@ -57,7 +57,7 @@
+         ta.setup_logging("CRITICAL")  # hide logging
+         np.random.seed(kwags.get("seed", 0))
+         torch.manual_seed(kwags.get("seed", 0))
+-        # random.seed(kwags.get('seed', 0))
++        __import__('random').seed(kwags.get('seed', 0))
+ 
+         self.FRAME_IDX = 0
+         self.task_name = kwags.get("task_name")
+@@ -317,10 +317,8 @@
+     def get_cluttered_table(self, cluttered_numbers=10, xlim=[-0.59, 0.59], ylim=[-0.34, 0.34], zlim=[0.741]):
+         self.record_cluttered_objects = []  # record cluttered objects
+ 
+-        xlim[0] += self.table_xy_bias[0]
+-        xlim[1] += self.table_xy_bias[0]
+-        ylim[0] += self.table_xy_bias[1]
+-        ylim[1] += self.table_xy_bias[1]
++        xlim = [x + self.table_xy_bias[0] for x in xlim]
++        ylim = [y + self.table_xy_bias[1] for y in ylim]
+ 
+         if np.random.rand() < self.clean_background_rate:
+             return
+@@ -386,9 +384,11 @@
+         load aloha robot urdf file, set root pose and set joints
+         """
+         if not hasattr(self, "robot"):
+-            self.robot = Robot(self.scene, self.need_topp, **kwags)
+-            self.robot.set_planner(self.scene)
+-            self.robot.init_joints()
++            # Do not publish a Robot that a timeout can leave half initialized.
++            robot = Robot(self.scene, self.need_topp, **kwags)
++            robot.set_planner(self.scene)
++            robot.init_joints()
++            self.robot = robot
+         else:
+             self.robot.reset(self.scene, self.need_topp, **kwags)
+ 
+--- a/envs/robot/robot.py
++++ b/envs/robot/robot.py
+@@ -20,6 +20,7 @@
+ 
+     def __init__(self, scene, need_topp=False, **kwargs):
+         super().__init__()
++        self._planner_ready = False
+         ta.setup_logging("CRITICAL")  # hide logging
+         self._init_robot_(scene, need_topp, **kwargs)
+ 
+@@ -122,6 +123,8 @@
+         self.right_entity.set_root_pose(self.right_entity_origion_pose)
+ 
+     def reset(self, scene, need_topp=False, **kwargs):
++        if not getattr(self, "_planner_ready", False):
++            raise RuntimeError("Planner initialization incomplete; restart simulator worker")
+         self._init_robot_(scene, need_topp, **kwargs)
+ 
+         if self.communication_flag:
+@@ -255,6 +258,7 @@
+         print("right ee: ", self.right_ee.get_name())
+ 
+     def set_planner(self, scene=None):
++        self._planner_ready = False
+         abs_left_curobo_yml_path = os.path.join(CONFIGS.ROOT_PATH, self.left_curobo_yml_path)
+         abs_right_curobo_yml_path = os.path.join(CONFIGS.ROOT_PATH, self.right_curobo_yml_path)
+ 
+@@ -320,6 +324,8 @@
+                 scene,
+             )
+ 
++        self._planner_ready = True
++
+     def update_world_pcd(self, world_pcd):
+         try:
+             self.left_planner.update_point_cloud(world_pcd, resolution=0.02)
+--- a/task_config/demo_clean.yml
++++ b/task_config/demo_clean.yml
+@@ -1,10 +1,9 @@
+-# if you want to modify the config, please check the following tutorial first:
+-# https://robotwin-platform.github.io/doc/usage/configurations.html
+ render_freq: 0
+ episode_num: 50
+ use_seed: false
+ save_freq: 15
+-embodiment: [aloha-agilex]
++embodiment:
++- aloha-agilex
+ language_num: 100
+ domain_randomization:
+   random_background: false
+@@ -33,5 +32,5 @@
+ pcd_crop: true
+ save_path: ./data
+ clear_cache_freq: 5
+-collect_data: true
+-eval_video_log: true
++collect_data: false
++eval_video_log: false
+--- a/task_config/demo_randomized.yml
++++ b/task_config/demo_randomized.yml
+@@ -1,10 +1,9 @@
+-# if you want to modify the config, please check the following tutorial first:
+-# https://robotwin-platform.github.io/doc/usage/configurations.html
+ render_freq: 0
+ episode_num: 50
+ use_seed: false
+ save_freq: 15
+-embodiment: [aloha-agilex]
++embodiment:
++- aloha-agilex
+ language_num: 100
+ domain_randomization:
+   random_background: true
+@@ -33,5 +32,5 @@
+ pcd_crop: true
+ save_path: ./data
+ clear_cache_freq: 5
+-collect_data: true
+-eval_video_log: true
++collect_data: false
++eval_video_log: false

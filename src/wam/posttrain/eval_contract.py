@@ -7,15 +7,11 @@ import torch
 from wam.datasets.lerobot.transforms.libero_flu_bi import LIBERO_FLU_BI_CONTRACT, LiberoRight80FLUBIdentityTransform
 
 
-def validate_evaluation_contract(cfg, payload, stats_path, *, expected_pretrain_step):
+def validate_evaluation_contract(cfg, payload, stats_path, *, expected_pretrain_step=None):
     """Do not evaluate old AB weights using the new inverse transform."""
     version = LIBERO_FLU_BI_CONTRACT["version"]
     if cfg.joint96_posttrain.libero_frame_contract != version:
         raise ValueError("Expected the new FLU/B=I posttraining configuration")
-    if type(expected_pretrain_step) is not int or expected_pretrain_step <= 0:
-        raise ValueError("An explicit positive pretraining step is required")
-    if cfg.joint96_posttrain.expected_pretrain_step != expected_pretrain_step:
-        raise ValueError("Unexpected pretraining recipe in saved training config")
     for split in ("train", "val"):
         target = cfg.data[split].processor.action_state_transforms[0]._target_
         if target != "wam.datasets.lerobot.transforms.libero_flu_bi.LiberoRight80FLUBIdentityTransform":

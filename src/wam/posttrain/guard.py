@@ -30,6 +30,12 @@ def validate_scope(cfg):
     if select('resume') is not None:
         raise ValueError('This release accepts fresh weights-only initialization; full-state resume is not certified')
     robocasa = select('joint96_posttrain.robocasa.enabled', False)
+    robotwin = select('joint96_posttrain.robotwin_softprompt.enabled', False)
+    if robotwin:
+        from wam.training.robotwin_robot37_softprompt import validate_robotwin_prompt
+        validate_robotwin_prompt(cfg)
+        if robocasa or not select('joint96_posttrain.online_robotwin') or select('joint96_posttrain.cached_visuals'):
+            raise ValueError('RoboTwin requires explicit online RGB posttraining')
     if robocasa:
         from wam.datasets.robocasa_delta80_slot18 import CONTRACT
         from wam.training.robocasa_posttrain import validate_robocasa_config
@@ -39,13 +45,14 @@ def validate_scope(cfg):
         if select('data.train.allow_smoke', False):
             if select('max_steps') not in (1, 2, 3) or select('batch_size') != 1:
                 raise ValueError('RoboCasa smoke is bounded to B1 and at most 3 updates')
-    domain = 'robocasa' if robocasa else 'libero'
-    reader = ('wam.datasets.robocasa_posttrain.RoboCasaPosttrainDataset' if robocasa
+    domain = 'robotwin' if robotwin else ('robocasa' if robocasa else 'libero')
+    reader = ('wam.datasets.robotwin_joint96_robot37.RobotwinJoint96OnlineDataset' if robotwin
+              else 'wam.datasets.robocasa_posttrain.RoboCasaPosttrainDataset' if robocasa
               else 'wam.datasets.libero_joint96_cache.LiberoJoint96CachedDataset')
     for split in ('train', 'val'):
         if select(f'data.{split}.domain') != domain or select(f'data.{split}._target_') != reader:
-            raise ValueError('Use the explicit cached LIBERO or RoboCasa reader and domain')
-    if not select('joint96_posttrain.cached_visuals') or select('video_latent_cache', 'off') != 'off':
+            raise ValueError('Use the explicit benchmark reader and domain')
+    if (not robotwin and not select('joint96_posttrain.cached_visuals')) or select('video_latent_cache', 'off') != 'off':
         raise ValueError('Native visual cache generation is not part of this release')
     if select('model.joint_visual_codec.source_root') != 'bundled://dino-stvae-v1':
         raise ValueError('External encoder source roots are not allowed')

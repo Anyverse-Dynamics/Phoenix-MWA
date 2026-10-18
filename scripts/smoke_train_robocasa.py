@@ -36,7 +36,6 @@ def compare_groups(model, payload):
 def load(self, model):
     result = _load(self, model)
     payload = torch.load(self.cfg.init_checkpoint, mmap=True, weights_only=True, map_location='cpu')
-    assert payload['step'] == self.cfg.joint96_posttrain.expected_pretrain_step > 0
     key = 'mixtures.action.embodiment_prompt.embedding.weight'
     prompt = payload['mot'][key].clone()
     assert not prompt[18].count_nonzero()
@@ -90,7 +89,7 @@ def finish(self):
     rank = self.accelerator.process_index
     report = dict(rank=rank, world_size=4, batch_size=1, step=self.global_step,
         engine_steps=self.model.global_steps, skipped_steps=self.model.skipped_steps,
-        pretrain_step=int(self.cfg.joint96_posttrain.expected_pretrain_step), exact_initialization_except_fresh_slot18=self._smoke_init,
+        pretrain_step=self._unwrap_core_model().model_paths['posttrain_initialization']['step'], exact_initialization_except_fresh_slot18=self._smoke_init,
         metrics=self._smoke_metrics, parameter_groups_changed=changed,
         prompt_slot18_max_delta=float(prompt_delta[18].max()), online_encoder_calls=0,
         grad_norm=float(self.model.get_global_grad_norm()),

@@ -5,8 +5,6 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 : "${PYTHON:?}" "${RUN_ID:?Use a new run name}" "${ROBOCASA_PACKAGE:?}" "${ROBOCASA_CACHE:?}"
 : "${WAM_PRETRAIN_CHECKPOINT:?}" "${STVAE_CHECKPOINT:?}" "${DINO_ENCODER_CHECKPOINT:?}" "${DIFFSYNTH_MODEL_BASE_PATH:?}"
-: "${EXPECTED_PRETRAIN_STEP:?Set the actual initialization checkpoint step}"
-export EXPECTED_PRETRAIN_STEP
 export ROBOCASA_REGISTRY="$ROOT/configs/embodiment_registry/robocasa_gr1_delta80_slot18_v1.json"
 export PATH="$(dirname "$PYTHON"):$PATH" PYTHONPATH="$ROOT/src:$ROOT"
 export PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1

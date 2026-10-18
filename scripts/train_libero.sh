@@ -12,9 +12,7 @@ export OMP_NUM_THREADS="${OMP_NUM_THREADS:-1}" OPENBLAS_NUM_THREADS=1
 export HF_HUB_OFFLINE=1 HF_DATASETS_OFFLINE=1 DIFFSYNTH_SKIP_DOWNLOAD=true
 export TOKENIZERS_PARALLELISM=false
 export EMBODIMENT_REGISTRY="$ROOT/configs/embodiment_registry/local_robot37_arm18_capacity28_v1.json"
-export LIBERO_FLU_BI_NORM_STATS="$ROOT/assets/stats/libero_joint96_flu_b_identity_v1.json"
-: "${EXPECTED_PRETRAIN_STEP:?Set the actual initialization checkpoint step}"
-export EXPECTED_PRETRAIN_STEP
+export LIBERO_FLU_BI_NORM_STATS="$ROOT/assets/stats/phoenix_libero.json"
 export LIBERO_PAIR_BINDING="${LIBERO_PAIR_BINDING:-${LIBERO_STVAE_CACHE:?}/JOINT96_PAIR_BINDING.json}"
 export WANDB_MODE="${WANDB_MODE:-offline}"
 export WANDB_PROJECT="${WANDB_PROJECT:-phoenix-mwa}"

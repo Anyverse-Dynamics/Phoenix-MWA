@@ -18,9 +18,6 @@ from wam.utils.config_resolvers import register_default_resolvers
 
 
 def validate_recipe(cfg):
-    step = cfg.joint96_posttrain.expected_pretrain_step
-    if type(step) is not int or step <= 0:
-        raise ValueError("Configure a positive integer expected_pretrain_step")
     if cfg.resume is not None or cfg.local_robot_joint96.enabled:
         raise ValueError("Fresh LIBERO post-training only, not full-state resume")
     if not 0 <= cfg.min_learning_rate <= cfg.learning_rate or cfg.learning_rate <= 0:
@@ -58,8 +55,7 @@ def main():
     validate_training_config(cfg)
     validate_soft_prompt_config(cfg)
     validate_recipe(cfg)
-    if (result["pretrain_step"] != cfg.joint96_posttrain.expected_pretrain_step
-            or Path(cfg.init_checkpoint).resolve() != Path(result["checkpoint"]).resolve()):
+    if Path(cfg.init_checkpoint).resolve() != Path(result["checkpoint"]).resolve():
         raise ValueError("Inspected checkpoint is not the training checkpoint")
     checkpoint = inspect_checkpoint(cfg.init_checkpoint, cfg.joint96_posttrain.expected_pretrain_step)
     if args.resources:

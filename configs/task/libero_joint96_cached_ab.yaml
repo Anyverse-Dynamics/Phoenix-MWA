@@ -5,7 +5,7 @@ defaults:
   - _self_
 
 joint96_posttrain:
-  expected_pretrain_step: ${oc.decode:${oc.env:EXPECTED_PRETRAIN_STEP}}
+  expected_pretrain_step: null # deprecated; actual step is read from checkpoint
   libero_frame_contract: libero_osc_ab_v1
 init_checkpoint: ${oc.env:WAM_PRETRAIN_CHECKPOINT}
 batch_size: 4

@@ -1,0 +1,31 @@
+{
+  "schema": "phoenix.robocasa.tasks.v1",
+  "environment_template": "gr1_unified/{task}_GR1ArmsAndWaistFourierHands_Env",
+  "instruction_source": "observation:annotation.human.coarse_action",
+  "tasks": [
+    "PnPCupToDrawerClose",
+    "PnPPotatoToMicrowaveClose",
+    "PnPMilkToMicrowaveClose",
+    "PnPBottleToCabinetClose",
+    "PnPWineToCabinetClose",
+    "PnPCanToDrawerClose",
+    "PosttrainPnPNovelFromCuttingboardToBasketSplitA",
+    "PosttrainPnPNovelFromCuttingboardToCardboardboxSplitA",
+    "PosttrainPnPNovelFromCuttingboardToPanSplitA",
+    "PosttrainPnPNovelFromCuttingboardToPotSplitA",
+    "PosttrainPnPNovelFromCuttingboardToTieredbasketSplitA",
+    "PosttrainPnPNovelFromPlacematToBasketSplitA",
+    "PosttrainPnPNovelFromPlacematToBowlSplitA",
+    "PosttrainPnPNovelFromPlacematToPlateSplitA",
+    "PosttrainPnPNovelFromPlacematToTieredshelfSplitA",
+    "PosttrainPnPNovelFromPlateToBowlSplitA",
+    "PosttrainPnPNovelFromPlateToCardboardboxSplitA",
+    "PosttrainPnPNovelFromPlateToPanSplitA",
+    "PosttrainPnPNovelFromPlateToPlateSplitA",
+    "PosttrainPnPNovelFromTrayToCardboardboxSplitA",
+    "PosttrainPnPNovelFromTrayToPlateSplitA",
+    "PosttrainPnPNovelFromTrayToPotSplitA",
+    "PosttrainPnPNovelFromTrayToTieredbasketSplitA",
+    "PosttrainPnPNovelFromTrayToTieredshelfSplitA"
+  ]
+}

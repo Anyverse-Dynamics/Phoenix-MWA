@@ -5,7 +5,9 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 : "${CHECKPOINT:?Set a stable posttraining weight checkpoint}"
 : "${TRAIN_CONFIG:?Set the saved training config.yaml}"
-: "${ROBOCASA_PACKAGE:?Set the matching numeric/text package}"
+export ROBOCASA_PACKAGE="${ROBOCASA_PACKAGE:-$ROOT/assets/robocasa}"
+export ROBOCASA_SCENE_SEEDS="${ROBOCASA_SCENE_SEEDS:-$ROOT/assets/robocasa/scene_seed_list.json}"
+ROBOCASA_TASKS="${ROBOCASA_TASKS:-$ROOT/assets/robocasa/tasks.json}"
 : "${OUTROOT:?Set a new evaluation output directory}"
 : "${POLICY_PYTHON:?}" "${ROBOCASA_SCENE_SEEDS:?}"
 export SCENE_SEED_LIST="$ROBOCASA_SCENE_SEEDS"
@@ -46,34 +48,17 @@ if [[ "${DRY_RUN:-0}" != 1 ]]; then
   "$POLICY_PYTHON" tools/require_robocasa_acceptance.py
 fi
 
-TASKS=(
-  PnPCupToDrawerClose PnPPotatoToMicrowaveClose PnPMilkToMicrowaveClose
-  PnPBottleToCabinetClose PnPWineToCabinetClose PnPCanToDrawerClose
-  PosttrainPnPNovelFromCuttingboardToBasketSplitA
-  PosttrainPnPNovelFromCuttingboardToCardboardboxSplitA
-  PosttrainPnPNovelFromCuttingboardToPanSplitA
-  PosttrainPnPNovelFromCuttingboardToPotSplitA
-  PosttrainPnPNovelFromCuttingboardToTieredbasketSplitA
-  PosttrainPnPNovelFromPlacematToBasketSplitA
-  PosttrainPnPNovelFromPlacematToBowlSplitA
-  PosttrainPnPNovelFromPlacematToPlateSplitA
-  PosttrainPnPNovelFromPlacematToTieredshelfSplitA
-  PosttrainPnPNovelFromPlateToBowlSplitA
-  PosttrainPnPNovelFromPlateToCardboardboxSplitA
-  PosttrainPnPNovelFromPlateToPanSplitA
-  PosttrainPnPNovelFromPlateToPlateSplitA
-  PosttrainPnPNovelFromTrayToCardboardboxSplitA
-  PosttrainPnPNovelFromTrayToPlateSplitA
-  PosttrainPnPNovelFromTrayToPotSplitA
-  PosttrainPnPNovelFromTrayToTieredbasketSplitA
-  PosttrainPnPNovelFromTrayToTieredshelfSplitA
-)
+TASK_NAMES="$(PYTHONPATH="$ROOT/src:${PYTHONPATH:-}" "$POLICY_PYTHON" -c \
+  'import sys; from wam.inference.robocasa_resources import load_tasks; print("\n".join(load_tasks(sys.argv[1])))' \
+  "$ROBOCASA_TASKS")"
+mapfile -t TASKS <<< "$TASK_NAMES"
 TASK_LIMIT="${ROBOCASA_TASK_LIMIT:-24}"
 [[ "$TASK_LIMIT" =~ ^[1-9][0-9]*$ && "$TASK_LIMIT" -le 24 ]] || { echo 'ROBOCASA_TASK_LIMIT must be 1..24' >&2; exit 2; }
 TASKS=("${TASKS[@]:0:TASK_LIMIT}")
 if [[ "${DRY_RUN:-0}" != 1 ]]; then
   [[ ! -e "$OUTROOT" ]] || { echo "Refusing existing OUTROOT: $OUTROOT" >&2; exit 2; }
   mkdir -p "$OUTROOT"
+  cp -- "$ROBOCASA_TASKS" "$OUTROOT/tasks.json"
   "$POLICY_PYTHON" tools/require_robocasa_acceptance.py --output "$OUTROOT/evaluation_acceptance.json"
   exec > >(tee -a "$OUTROOT/launcher.top.log") 2>&1
   if [[ "$SCENE_SEED_MODE" == seed_list ]]; then

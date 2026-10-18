@@ -4,8 +4,6 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 : "${PYTHON:?}" "${RUN_ID:?Use a fresh smoke ID}" "${WAM_PRETRAIN_CHECKPOINT:?}"
-: "${EXPECTED_PRETRAIN_STEP:?Set the actual initialization checkpoint step}"
-export EXPECTED_PRETRAIN_STEP
 export PATH="$(dirname "$PYTHON"):$PATH" PYTHONPATH="$ROOT/src:$ROOT"
 export PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
 export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 TOKENIZERS_PARALLELISM=false
@@ -13,7 +11,7 @@ export HF_HUB_OFFLINE=1 HF_DATASETS_OFFLINE=1 DIFFSYNTH_SKIP_DOWNLOAD=true
 export WANDB_MODE=disabled WAM_TIMING_STEPS=0 TORCH_COMPILE_ENABLED=false
 export HF_DATASETS_CACHE="$ROOT/.cache/huggingface/datasets"
 export EMBODIMENT_REGISTRY="$ROOT/configs/embodiment_registry/local_robot37_arm18_capacity28_v1.json"
-export LIBERO_FLU_BI_NORM_STATS="$ROOT/assets/stats/libero_joint96_flu_b_identity_v1.json"
+export LIBERO_FLU_BI_NORM_STATS="$ROOT/assets/stats/phoenix_libero.json"
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True NCCL_DEBUG=WARN HYDRA_FULL_ERROR=1
 export CUDA_VISIBLE_DEVICES="${SMOKE_GPUS:-0,1,2,3}"
 unset RESUME_STATE FASTWAM_LOW_VRAM STOP_AFTER_STEP WANDB_RUN_ID WANDB_RESUME

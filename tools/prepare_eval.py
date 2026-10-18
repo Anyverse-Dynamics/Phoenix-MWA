@@ -49,11 +49,10 @@ def prepare(args):
     dino, stvae, model_base = existing(args.dino), existing(args.stvae), existing(args.model_base)
     cfg = OmegaConf.load(config)
     payload = torch.load(checkpoint, map_location='cpu', mmap=True, weights_only=True)
-    step = int(payload['step'])
+    from wam.utils.checkpoint_steps import checkpoint_steps
+    progress = checkpoint_steps(payload)
+    step, pretrain_step = progress['step'], progress['pretrain_step']
     del payload
-    pretrain_step = int(cfg.joint96_posttrain.expected_pretrain_step)
-    if step <= 0 or pretrain_step <= 0:
-        raise ValueError('Checkpoint and initialization steps must be positive')
     output = Path(args.output).resolve()
     if output.exists(): raise FileExistsError(f'Use a new output directory: {output}')
     if args.benchmark in ('libero-plus', 'libero-pro'):
@@ -68,11 +67,16 @@ def prepare(args):
             if not (pro_repo/'libero/libero/benchmark/__init__.py').is_file():
                 raise FileNotFoundError(pro_repo/'libero/libero/benchmark/__init__.py')
     else:
-        if not all((args.package, args.resources, args.scene_seeds)):
-            raise ValueError('RoboCasa needs --package, --resources and --scene-seeds')
-        package, resources, seeds = existing(args.package), existing(args.resources), existing(args.scene_seeds)
-        for item in ('package.json', 'norm.json', 'text/COMPLETE.json'):
-            if not (package/item).is_file(): raise FileNotFoundError(package/item)
+        if not args.resources:
+            raise ValueError('RoboCasa needs --resources for simulator sources/assets')
+        from wam.inference.robocasa_resources import DEFAULT_PACKAGE, DEFAULT_SEEDS, load_inference_package
+        package = existing(args.package or DEFAULT_PACKAGE)
+        resources, seeds = existing(args.resources), existing(args.scene_seeds or DEFAULT_SEEDS)
+        load_inference_package(package)
+        from wam.robocasa_seeds import load_scene_seed_list
+        load_scene_seed_list(seeds, 1)
+        from wam.inference.robocasa_normalization import resolve_normalization_stats
+        stats = resolve_normalization_stats(cfg, override=getattr(args, 'stats', None))
     registry = ROOT/'configs/embodiment_registry'/(
         'local_robot37_arm18_capacity28_v1.json' if args.benchmark in ('libero-plus', 'libero-pro')
         else 'robocasa_gr1_delta80_slot18_v1.json')
@@ -85,6 +89,8 @@ def prepare(args):
         'model.joint_visual_codec.source_sha256': None,
         'model.joint_visual_codec.stvae_checkpoint_path': str(stvae),
         'model.joint_visual_codec.dino_kwargs.checkpoint_path': str(dino),
+        'model.joint_visual_codec.dino_kwargs.starvla_source_path': 'bundled://dino-stvae-v1/third_party/dino_runtime',
+        'model.joint_visual_codec.dino_kwargs.dinov3_source_path': 'bundled://dino-stvae-v1/third_party/dino_runtime/dinov3',
         'model.joint_visual_codec.dino_kwargs.verify_source_commit': False,
     }
     env = dict(PYTHON=sys.executable, POLICY_PYTHON=sys.executable,
@@ -98,16 +104,17 @@ def prepare(args):
         (output/'initialization.json').write_text(json.dumps({'pretrain_step':pretrain_step})+'\n')
         config_target = output/'train_config.yaml'
         env.update(JOINT96_EVAL_RESOURCE_DIR=str(output), JOINT96_EVAL_CHECKPOINT_FILENAME='policy.pt',
-                   JOINT96_EVAL_STEP=str(step), EVAL_PRETRAIN_STEP=str(pretrain_step),
                    LIBERO_BENCHMARK_ROOT=str(benchmark), EVAL_OUTPUT=str(output/'evaluation'),
                    EVAL_TEXT_CACHE=str(output/'text_cache'), EVAL_ENV_BACKEND='inprocess')
         if args.benchmark == 'libero-pro':
             env.update(WAM_LIBERO_REPO='LIBERO-PRO', LIBERO_PRO_REPO_ROOT=str(pro_repo))
     else:
         config_target = output/'config.yaml'
+        updates['inference.normalization_stats'] = str(stats)
+        updates['inference.text_cache_dir'] = str(output/'text_cache')
         for split in ('train', 'val'):
             updates.update({f'data.{split}.package_root':str(package),
-                            f'data.{split}.pretrained_norm_stats':str(package/'norm.json')})
+                            f'data.{split}.pretrained_norm_stats':str(stats)})
         env.update(CHECKPOINT=str(checkpoint), TRAIN_CONFIG=str(config_target),
                    ROBOCASA_PACKAGE=str(package), ROBOCASA_RESOURCES=str(resources),
                    ROBOCASA_SCENE_SEEDS=str(seeds), OUTROOT=str(output/'evaluation'),
@@ -126,7 +133,8 @@ def prepare(args):
     target = output/'eval.env.sh'
     target.write_text(''.join(f'export {key}={shlex.quote(value)}\n' for key,value in env.items()))
     (output/'prepare.json').write_text(json.dumps(dict(benchmark=args.benchmark,
-        checkpoint=str(checkpoint), step=step, hash_validation=False, inference_launched=False),indent=2)+'\n')
+        checkpoint=str(checkpoint), step=step, normalization_stats=str(stats),
+        hash_validation=False, inference_launched=False),indent=2)+'\n')
     return target
 
 
@@ -136,10 +144,12 @@ def main():
     p.add_argument('--libero-repo-root', help='External LIBERO-PRO checkout (not installed over LIBERO-Plus)')
     for name in ('checkpoint','config','dino','stvae','model-base','output'):
         p.add_argument('--'+name,required=True)
-    p.add_argument('--stats')
+    p.add_argument('--stats', help='LIBERO statistics (required), or an explicit RoboCasa inference statistics override')
     p.add_argument('--benchmark-root',default='third_party/LIBERO-plus/libero/libero')
-    for name in ('package','resources','scene-seeds','sim-python'):p.add_argument('--'+name)
-    p.add_argument('--metadata-root', help='Relocated RoboCasa task/meta files directory')
+    p.add_argument('--package', help='Optional inference manifest directory; defaults to assets/robocasa')
+    p.add_argument('--scene-seeds', help='Optional saved scene seed list; defaults to assets/robocasa/scene_seed_list.json')
+    for name in ('resources','sim-python'):p.add_argument('--'+name)
+    p.add_argument('--metadata-root', help='Legacy training metadata relocation; not needed for inference')
     p.add_argument('--render-backend',choices=('egl','osmesa'),default='egl')
     print(prepare(p.parse_args()))
 

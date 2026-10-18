@@ -186,9 +186,6 @@ def _joint96_identity(metadata):
         identity['current_conditioning'] = encoder['current_conditioning']
     for key in ('stvae_checkpoint_sha256', 'teacher_sha256', 'stvae_step', 'teacher_checkpoint_state', 'teacher_output_source', 'teacher_preprocessing', 'dinov3_source_commit'):
         identity[key] = stvae.get(key)
-    for key in ('stvae_step',):
-        if not identity[key]:
-            raise ValueError(f'Joint96 checkpoint identity missing {key}')
     if 'soft_prompt' in metadata:
         from wam.embodiment_registry import EmbodimentRegistry
         prompt = metadata['soft_prompt']
@@ -204,7 +201,7 @@ def _load_joint96_checkpoint(model, payload, *, initialize_soft_prompt=False, in
     incoming_identity = _joint96_identity(payload.get('joint96_metadata'))
     expected_identity = _joint96_identity(joint96_checkpoint_metadata(model))
     if initialize_independent_current:
-        if payload.get('step') != 100000 or 'current_conditioning' in incoming_identity or expected_identity.get('current_conditioning') != 'independent_single_frame_v1' or payload['joint96_metadata'].get('soft_prompt', {}).get('training_contract'):
+        if 'current_conditioning' in incoming_identity or expected_identity.get('current_conditioning') != 'independent_single_frame_v1' or payload['joint96_metadata'].get('soft_prompt', {}).get('training_contract'):
             raise ValueError('Invalid independent-current pretraining transfer')
         expected_identity.pop('current_conditioning')
     incoming_attention = incoming_identity['action_video_attention']
@@ -241,7 +238,7 @@ def _load_joint96_checkpoint(model, payload, *, initialize_soft_prompt=False, in
             module.load_state_dict(state, strict=True)
     return payload
 
-def load_joint96_soft_prompt_initialization(model, path, *, expected_step, frame_ablation=None):
+def load_joint96_soft_prompt_initialization(model, path, *, expected_step=None, frame_ablation=None):
     """Explicit old-policy to prompt-policy transfer before AdamW/ZeRO creation."""
     path = Path(str(path)).expanduser()
     if not path.is_absolute() or not path.is_file():
@@ -253,12 +250,11 @@ def load_joint96_soft_prompt_initialization(model, path, *, expected_step, frame
     if OmegaConf.select(source_config, 'data.frame_ablation') != frame_ablation:
         raise ValueError("Soft prompt migration must preserve the parent's A/B treatment")
     payload = torch.load(path, map_location='cpu', mmap=True, weights_only=True)
-    if type(payload.get('step')) is not int or payload['step'] != expected_step:
-        raise ValueError('Soft prompt source checkpoint step mismatch')
+    expected_step = payload.get('step')  # legacy argument ignored; record actual progress
     _load_joint96_checkpoint(model, payload, initialize_soft_prompt=True)
     return {'checkpoint': str(path.resolve()), 'pretrain_step': expected_step, 'new_global_step': 0, 'weights_only': True, 'new_parameters': ['mot.mixtures.action.embodiment_prompt.embedding.weight'], 'parent_config_sha256': joint96_file_sha256(config_path), 'frame_ablation': frame_ablation, 'soft_prompt': joint96_checkpoint_metadata(model)['soft_prompt']}
 
-def load_joint96_initialization(model, path, *, expected_step):
+def load_joint96_initialization(model, path, *, expected_step=None):
     """Strict weights-only transfer, called before AdamW/ZeRO master creation."""
     path = Path(str(path)).expanduser()
     if not path.is_absolute() or not path.is_file():
@@ -266,8 +262,7 @@ def load_joint96_initialization(model, path, *, expected_step):
     if not bool(getattr(model, 'joint96_three_view', False)):
         raise ValueError('Joint96 initialization requires a Joint96 model')
     payload = torch.load(path, map_location='cpu', mmap=True, weights_only=True)
-    if type(payload.get('step')) is not int or payload['step'] != int(expected_step):
-        raise ValueError(f"Pretraining step mismatch: expected {expected_step}, got {payload.get('step')}")
+    payload.setdefault('step', None)
     conditioning = getattr(getattr(model, 'joint_visual_encoder', None), 'current_conditioning', 'legacy_clip_prefix')
     migrate_current = conditioning == 'independent_single_frame_v1'
     _load_joint96_checkpoint(model, payload, initialize_independent_current=migrate_current)

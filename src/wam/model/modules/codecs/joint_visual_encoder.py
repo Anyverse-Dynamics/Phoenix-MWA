@@ -65,7 +65,7 @@ class JointVisualEncoder(nn.Module):
             from .dino_stvae.provenance import RUNTIME
             dino_kwargs['starvla_source_path'] = str(RUNTIME)
             dino_kwargs['dinov3_source_path'] = str(RUNTIME / 'dinov3')
-        stvae = encoder_class(dino_kwargs=dino_kwargs, stvae_checkpoint_path=str(config['stvae_checkpoint_path']), expected_stvae_step=int(config['expected_stvae_step'])).to(device=device)
+        stvae = encoder_class(dino_kwargs=dino_kwargs, stvae_checkpoint_path=str(config['stvae_checkpoint_path']), expected_stvae_step=None).to(device=device)
         wrapper = cls(vae, stvae, current_conditioning=config.get('current_conditioning', 'legacy_clip_prefix'))
         resolved_root = source_root if source_root == 'bundled://dino-stvae-v1' else str(Path(source_root).resolve())
         wrapper.metadata.update(source_root=resolved_root, source_sha256=source_digest)

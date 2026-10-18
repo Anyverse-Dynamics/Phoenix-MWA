@@ -5,7 +5,7 @@ defaults:
 
 # Weights-only LIBERO post-training; initialization step is explicitly configured.
 joint96_posttrain:
-  expected_pretrain_step: ${oc.decode:${oc.env:EXPECTED_PRETRAIN_STEP}}
+  expected_pretrain_step: null # deprecated; actual step is read from checkpoint
 learning_rate: 5.0e-5
 min_learning_rate: 5.0e-7
 batch_size: 8

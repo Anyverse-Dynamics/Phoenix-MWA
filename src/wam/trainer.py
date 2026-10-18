@@ -817,7 +817,7 @@ class WAMTrainer:
                 output = Path(self.output_dir)
                 output.mkdir(parents=True, exist_ok=True)
                 (output / "initialization.json").write_text(json.dumps(receipt, indent=2) + "\n")
-            logger.info("[soft prompt] weights-only migration from step=%d; new optimizer and step=0",
+            logger.info("[soft prompt] weights-only migration from step=%s; new optimizer and step=0",
                         receipt["pretrain_step"])
             return True
         if bool(self.cfg.get("joint96_posttrain", {}).get("enabled", False)):
@@ -838,7 +838,7 @@ class WAMTrainer:
                 output = Path(self.output_dir)
                 output.mkdir(parents=True, exist_ok=True)
                 (output / "initialization.json").write_text(json.dumps(receipt, indent=2) + "\n")
-            logger.info("[joint96 posttrain] inherited step=%d, fresh optimizer/scheduler and step=0",
+            logger.info("[joint96 posttrain] inherited step=%s, fresh optimizer/scheduler and step=0",
                         receipt["pretrain_step"])
             return True
         resume = self.resume

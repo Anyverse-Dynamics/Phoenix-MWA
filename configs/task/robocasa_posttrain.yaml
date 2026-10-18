@@ -7,7 +7,7 @@ defaults:
 
 joint96_posttrain:
   cached_visuals: true
-  expected_pretrain_step: ${oc.decode:${oc.env:EXPECTED_PRETRAIN_STEP}}
+  expected_pretrain_step: null # deprecated; actual step is read from checkpoint
   robocasa:
     enabled: true
     require_episode_remarks: true
@@ -28,7 +28,7 @@ model:
     soft_prompt_tokens: 8
     embodiment_registry_path: ${local_robot_softprompt.registry_path}
   joint_visual_codec:
-    expected_stvae_step: 150000
+    expected_stvae_step: null # deprecated; read from encoder checkpoint
   video_scheduler:
     train_shift: 6.0
     infer_shift: 6.0

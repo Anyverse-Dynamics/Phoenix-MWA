@@ -38,15 +38,14 @@ def validate_abs47_identity(incoming, expected):
     if semantic_contract(migrated) != semantic_contract(expected):
         raise ValueError('absolute47 transfer changed an unrelated encoder/model/prompt identity')
 
-def load_robocasa_abs47_initialization(model, path, *, expected_step):
+def load_robocasa_abs47_initialization(model, path, *, expected_step=None):
     """Explicit 80->47 weights-only migration before AdamW/ZeRO construction."""
     from wam.training.checkpoint import _joint96_identity, joint96_checkpoint_metadata, _load_joint96_checkpoint
     path = Path(path)
     if not path.is_absolute() or not path.is_file():
         raise ValueError('absolute47 initialization requires an absolute checkpoint file')
     payload = torch.load(path, mmap=True, map_location='cpu', weights_only=True)
-    if type(payload.get('step')) is not int or payload['step'] != expected_step:
-        raise ValueError('absolute47 parent checkpoint step mismatch')
+    expected_step = payload.get('step')
     metadata = joint96_checkpoint_metadata(model)
     validate_abs47_identity(_joint96_identity(payload.get('joint96_metadata')), _joint96_identity(metadata))
     prompt_key = 'mixtures.action.embodiment_prompt.embedding.weight'
@@ -86,15 +85,14 @@ def validate_delta80_slot18_identity(incoming, expected):
     if semantic_contract(migrated) != semantic_contract(expected):
         raise ValueError('delta80 slot18 transfer changed an unrelated model identity')
 
-def load_robocasa_delta80_slot18_initialization(model, path, *, expected_step):
+def load_robocasa_delta80_slot18_initialization(model, path, *, expected_step=None):
     """Strictly inherit every weight except the newly activated prompt row."""
     from wam.training.checkpoint import _joint96_identity, joint96_checkpoint_metadata, _load_joint96_checkpoint
     path = Path(path)
     if not path.is_absolute() or not path.is_file():
         raise ValueError('delta80 slot18 initialization requires an absolute checkpoint file')
     payload = torch.load(path, mmap=True, map_location='cpu', weights_only=True)
-    if type(payload.get('step')) is not int or payload['step'] != expected_step:
-        raise ValueError('delta80 slot18 parent checkpoint step mismatch')
+    expected_step = payload.get('step')
     metadata = joint96_checkpoint_metadata(model)
     validate_delta80_slot18_identity(_joint96_identity(payload.get('joint96_metadata')), _joint96_identity(metadata))
     key = 'mixtures.action.embodiment_prompt.embedding.weight'
@@ -113,13 +111,10 @@ def validate_robocasa_config(cfg):
     slot18 = get('joint96_posttrain.robocasa.frame_contract') == DELTA80_SLOT18_CONTRACT['version']
     contract = ABS47_CONTRACT if absolute else DELTA80_SLOT18_CONTRACT if slot18 else CONTRACT
     dim = 47 if absolute else 80
-    required = {'joint96_posttrain.enabled': True, 'joint96_posttrain.cached_visuals': True, 'joint96_posttrain.robocasa.frame_contract': contract['version'], 'joint96_posttrain.robocasa.embodiment_id': contract['embodiment_id'], 'local_robot_joint96.enabled': False, 'local_robot_softprompt.enabled': True, 'local_robot_softprompt.init_checkpoint': None, 'resume': None, 'model.action_dit_config.num_embodiments': 28, 'model.action_dit_config.soft_prompt_tokens': 8, 'model.action_dit_config.action_dim': dim, 'model.proprio_dim': dim, 'model.joint_visual_codec.expected_stvae_step': 150000, 'model._target_': 'wam.training.robocasa_posttrain.create_robocasa_wam'}
+    required = {'joint96_posttrain.enabled': True, 'joint96_posttrain.cached_visuals': True, 'joint96_posttrain.robocasa.frame_contract': contract['version'], 'joint96_posttrain.robocasa.embodiment_id': contract['embodiment_id'], 'local_robot_joint96.enabled': False, 'local_robot_softprompt.enabled': True, 'local_robot_softprompt.init_checkpoint': None, 'resume': None, 'model.action_dit_config.num_embodiments': 28, 'model.action_dit_config.soft_prompt_tokens': 8, 'model.action_dit_config.action_dim': dim, 'model.proprio_dim': dim, 'model._target_': 'wam.training.robocasa_posttrain.create_robocasa_wam'}
     for key, expected in required.items():
         if get(key) != expected:
             raise ValueError(f'RoboCasa requires {key}={expected!r}')
-    step = get('joint96_posttrain.expected_pretrain_step')
-    if type(step) is not int or step <= 0:
-        raise ValueError('RoboCasa requires a positive integer expected_pretrain_step')
     for split in ('train', 'val'):
         if get(f'data.{split}.domain') != 'robocasa' or get(f'data.{split}.split') != split:
             raise ValueError('RoboCasa needs explicit train/val readers')
@@ -127,13 +122,11 @@ def validate_robocasa_config(cfg):
             if get(f'data.{split}.{key}') != get(f'data.train.{key}'):
                 raise ValueError(f'RoboCasa splits must share {key}')
 
-def validate_cached_initialization(payload, plan, expected_step):
+def validate_cached_initialization(payload, plan, expected_step=None):
     from wam.training.checkpoint import _joint96_identity
-    if type(payload.get('step')) is not int or payload['step'] != expected_step:
-        raise ValueError('RoboCasa initialization step mismatch')
     identity = _joint96_identity(payload.get('joint96_metadata'))
     for key, value in plan['encoder_identity'].items():
-        if 'sha256' in key or key == 'dinov3_source_commit':
+        if 'sha256' in key or key in ('dinov3_source_commit', 'stvae_step', 'teacher_step', 'pretrain_step'):
             continue
         if identity.get(key) != value:
             raise ValueError(f'Initialization/cache visual identity mismatch: {key}')
@@ -159,8 +152,8 @@ def wrap_robocasa_prompt(model, train, val, cfg, registry):
     init = Path(cfg.init_checkpoint).resolve()
     from wam.training.checkpoint import _joint96_identity, joint96_checkpoint_metadata
     identity = _joint96_identity(joint96_checkpoint_metadata(model))
-    step = int(cfg.joint96_posttrain.expected_pretrain_step)
     payload = torch.load(init, map_location='cpu', mmap=True, weights_only=True)
+    step = payload.get('step')
     incoming = validate_cached_initialization(payload, plan, step)
     if absolute:
         validate_abs47_identity(incoming, identity)

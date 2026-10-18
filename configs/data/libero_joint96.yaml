@@ -16,10 +16,10 @@ train:
   domain: libero
   camera_slots: [0, 2]
   dataset_dirs:
-    - ${oc.env:LIBERO_DATA_ROOT}/libero_spatial_no_noops_lerobot
-    - ${oc.env:LIBERO_DATA_ROOT}/libero_object_no_noops_lerobot
-    - ${oc.env:LIBERO_DATA_ROOT}/libero_goal_no_noops_lerobot
-    - ${oc.env:LIBERO_DATA_ROOT}/libero_10_no_noops_lerobot
+    - ${paths.libero}/libero_spatial_no_noops_lerobot
+    - ${paths.libero}/libero_object_no_noops_lerobot
+    - ${paths.libero}/libero_goal_no_noops_lerobot
+    - ${paths.libero}/libero_10_no_noops_lerobot
   shape_meta:
     images:
       - {key: image, raw_shape: [3, 512, 512], shape: [3, 256, 256]}
