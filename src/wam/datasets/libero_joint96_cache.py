@@ -1,10 +1,8 @@
 """Read immutable FastWAM LIBERO dual48 caches with native WAM action labels."""
 from collections import OrderedDict
 import hashlib
-import importlib
 import json
 from pathlib import Path
-import sys
 import numpy as np
 import torch
 from .joint96_posttrain import Joint96PosttrainDataset
@@ -34,32 +32,22 @@ class CacheRGBTransform:
 
 class PairedLiberoCache:
 
-    def __init__(self, *, vae_root, stvae_root, source_root, source_sha256=None, initialization_checkpoint, max_open_shards=32, pair_binding_file=None):
-        if str(source_root) == 'bundled://dino-stvae-v1':
-            from .joint96_cache_contracts import pair_contracts
-        else:
-            source = Path(source_root).resolve(strict=True)
-            package = source / 'src/fastwam'
-            for name, module in tuple(sys.modules.items()):
-                if name == 'fastwam' or name.startswith('fastwam.'):
-                    path = getattr(module, '__file__', None)
-                    require(not path or Path(path).resolve().is_relative_to(package), 'conflicting FastWAM import')
-            if str(source / 'src') not in sys.path:
-                sys.path.insert(0, str(source / 'src'))
-            pair_contracts = importlib.import_module('fastwam.datasets.libero_wan_vae_stvae_dataset').pair_contracts
+    def __init__(self, *, vae_root, csvae_root, source_root, source_sha256=None, initialization_checkpoint, max_open_shards=32, pair_binding_file=None):
+        require(str(source_root) == 'bundled://dino-csvae-v2', 'only the bundled CSVAE source is supported')
+        from .joint96_cache_contracts import pair_contracts
         if pair_binding_file is None:
-            self.roots, self.contracts = pair_contracts(vae_root, [Path(stvae_root) / view for view in ('head', 'wrist')])
+            self.roots, self.contracts = pair_contracts(vae_root, [Path(csvae_root) / view for view in ('head', 'wrist')])
         else:
-            from .libero_stvae_rebind import load_bound_pair
-            self.roots, self.contracts = load_bound_pair(vae_root, stvae_root, pair_binding_file, pair_contracts)
+            from .libero_csvae_rebind import load_bound_pair
+            self.roots, self.contracts = load_bound_pair(vae_root, csvae_root, pair_binding_file, pair_contracts)
         payload = torch.load(initialization_checkpoint, map_location='cpu', weights_only=True, mmap=True)
         identity = _joint96_identity(payload.get('joint96_metadata'))
         encoder = self.contracts[2]['encoder']
         for key in ('teacher_checkpoint_state', 'teacher_output_source', 'teacher_preprocessing', 'dinov3_source_commit'):
             require(encoder[key] == identity[key], f'pretraining/cache encoder mismatch: {key}')
-        from wam.model.modules.codecs.dino_stvae.provenance import canonical_source_identity
+        from wam.model.modules.codecs.dino_csvae.provenance import canonical_source_identity
         expected_source = canonical_source_identity(dict(source_root=str(source_root), source_sha256=source_sha256))
-        require(identity['channel_order'] == ['wan_vae48', 'stvae48'], 'channel order mismatch')
+        require(identity['channel_order'] == ['wan_vae48', 'csvae48'], 'channel order mismatch')
         self.snapshot = self.contracts[2]['dataset_snapshot']
         self.length = int(self.contracts[0]['dataset_length'])
         self.max_open_shards = int(max_open_shards)

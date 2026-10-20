@@ -118,7 +118,7 @@ def validate_robocasa_config(cfg):
     for split in ('train', 'val'):
         if get(f'data.{split}.domain') != 'robocasa' or get(f'data.{split}.split') != split:
             raise ValueError('RoboCasa needs explicit train/val readers')
-        for key in ('package_root', 'cache_root', 'pretrained_norm_stats', 'allow_smoke', 'smoke_selection'):
+        for key in ('package_root', 'cache_root', 'pretrained_norm_stats'):
             if get(f'data.{split}.{key}') != get(f'data.train.{key}'):
                 raise ValueError(f'RoboCasa splits must share {key}')
 
@@ -126,7 +126,7 @@ def validate_cached_initialization(payload, plan, expected_step=None):
     from wam.training.checkpoint import _joint96_identity
     identity = _joint96_identity(payload.get('joint96_metadata'))
     for key, value in plan['encoder_identity'].items():
-        if 'sha256' in key or key in ('dinov3_source_commit', 'stvae_step', 'teacher_step', 'pretrain_step'):
+        if 'sha256' in key or key in ('dinov3_source_commit', 'csvae_step', 'teacher_step', 'pretrain_step'):
             continue
         if identity.get(key) != value:
             raise ValueError(f'Initialization/cache visual identity mismatch: {key}')
@@ -163,8 +163,6 @@ def wrap_robocasa_prompt(model, train, val, cfg, registry):
         raise ValueError('RoboCasa initialization/model identity mismatch')
     del payload
     model.soft_prompt_training_contract = {'domain': 'robocasa', 'embodiment_id': slot, 'embodiment_name': name, 'frame_contract': copy.deepcopy(contract), 'package_sha256': train.package['sha256'], 'normalization_sha256': train.package['norm_sha256'], 'visual_plan_sha256': plan['sha256'], 'visual_attention_backend': 'math_sdpa', 'pretrain_step': step, 'pretrain_checkpoint': str(init), 'text_manifest_sha256': file_hash(train.root / 'text/COMPLETE.json')}
-    if getattr(train, 'smoke_selection_sha256', None):
-        model.soft_prompt_training_contract['smoke_selection_sha256'] = train.smoke_selection_sha256
     return (train, val)
 
 def install_robocasa_runtime(model):
@@ -190,8 +188,8 @@ def create_robocasa_wam(**kwargs):
     torch.backends.cuda.matmul.allow_tf32 = False
     torch.backends.cudnn.allow_tf32 = False
     loss = kwargs.get('loss', {})
-    if any((float(loss.get(name, default)) != default for name, default in (('lambda_video', 1.0), ('lambda_action', 1.0), ('lambda_vae', 0.5), ('lambda_stvae', 0.5)))):
-        raise ValueError('This RoboCasa port preserves action + 0.5 VAE + 0.5 STVAE loss')
+    if any((float(loss.get(name, default)) != default for name, default in (('lambda_video', 1.0), ('lambda_action', 1.0), ('lambda_vae', 0.5), ('lambda_csvae', 0.5)))):
+        raise ValueError('This RoboCasa port preserves action + 0.5 VAE + 0.5 CSVAE loss')
     model = create_wam(**kwargs)
     install_robocasa_runtime(model)
     encode = model.joint_visual_encoder.encode

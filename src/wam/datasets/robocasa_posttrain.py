@@ -40,15 +40,12 @@ def episode_remarks(path):
 def text_name(prompt):
     return hashlib.sha256(prompt.encode()).hexdigest() + '.t5_len128.wan22ti2v5b.pt'
 
-def select_episodes(plan, *, val_ratio=0.01, fewshot_ratio=1.0, seed=42, smoke=False):
+def select_episodes(plan, *, val_ratio=0.01, fewshot_ratio=1.0, seed=42):
     require(0 < val_ratio < 1 and 0 < fewshot_ratio <= 1, 'Invalid split/fewshot fraction')
     groups = defaultdict(list)
     for ep in plan['episodes']:
         groups[ep['task']].append(ep)
     selected = []
-    if smoke:
-        require(plan['scope'] == 'smoke' and len(plan['episodes']) >= 2, 'Use a smoke cache plan')
-        return [{**e, 'split': 'val' if i == len(plan['episodes']) - 1 else 'train'} for i, e in enumerate(plan['episodes'])]
     require(plan['scope'] == 'full24_all_episodes', 'Formal training requires the full cache plan')
     for task, episodes in sorted(groups.items()):
         ordered = sorted(episodes, key=lambda e: digest([seed, 'holdout', task, e['episode']]))
@@ -110,15 +107,15 @@ def _iter_episode_statistics(episodes, workers, action_space='delta80'):
             if ep is not None:
                 pending.append(pool.submit(compute, ep))
 
-def prepare_package(plan_path, output, *, val_ratio=0.01, fewshot_ratio=1.0, seed=42, smoke=False, workers=1, action_space='delta80'):
+def prepare_package(plan_path, output, *, val_ratio=0.01, fewshot_ratio=1.0, seed=42, workers=1, action_space='delta80'):
     space = action_space_module(action_space)
     dim = len(space.masks()[0])
     root, plan = (Path(output), load_plan(plan_path))
     root.mkdir(parents=True, exist_ok=True)
     with locked(root / 'prepare.lock'):
         require(not (root / 'package.json').exists(), 'Package already exists; use a new directory')
-        episodes = select_episodes(plan, val_ratio=val_ratio, fewshot_ratio=fewshot_ratio, seed=seed, smoke=smoke)
-        stats = {'contract': space.CONTRACT, 'mode': 'z-score' if action_space == 'absolute47' else 'minmax', 'purpose': 'smoke' if smoke else 'training', 'population': 'selected_training_native_rows_once_valid_dimensions_only'}
+        episodes = select_episodes(plan, val_ratio=val_ratio, fewshot_ratio=fewshot_ratio, seed=seed)
+        stats = {'contract': space.CONTRACT, 'mode': 'z-score' if action_space == 'absolute47' else 'minmax', 'purpose': 'training', 'population': 'selected_training_native_rows_once_valid_dimensions_only'}
         lows = {k: torch.full((dim,), float('inf')) for k in ('state', 'action')}
         highs = {k: torch.full((dim,), -float('inf')) for k in lows}
         counts = {k: torch.zeros(dim, dtype=torch.long) for k in lows}
@@ -164,7 +161,7 @@ def prepare_package(plan_path, output, *, val_ratio=0.01, fewshot_ratio=1.0, see
         print(json.dumps({'package': str(root), 'prompts': len(prompts), 'episodes': {k: len(v) for k, v in membership.items()}, 'sha256': package['sha256']}), flush=True)
     return package
 
-def load_package(root, *, allow_smoke=False):
+def load_package(root):
     root = Path(root)
     package = read_json(root / 'package.json')
     sha = package.pop('sha256', None)
@@ -173,7 +170,7 @@ def load_package(root, *, allow_smoke=False):
     if package['schema'] == REMARKS_SCHEMA:
         require(package.get('prompt_source') == 'episodes.jsonl:remarks', 'Missing episode prompt provenance')
     package['sha256'] = sha
-    require(package['purpose'] == 'training' or (allow_smoke and package['purpose'] == 'smoke'), 'Refusing smoke statistics in formal training')
+    require(package['purpose'] == 'training', 'Training statistics are required')
     membership = package['membership']
     require(set(map(tuple, membership['train'])).isdisjoint(map(tuple, membership['val'])), 'Episode split leakage')
     for path, record in package['metadata'].items():
@@ -199,10 +196,10 @@ class RoboCasaTextCache:
 
 class RoboCasaPosttrainDataset(Dataset):
 
-    def __init__(self, package_root, cache_root, *, split='train', allow_smoke=False, domain='robocasa', pretrained_norm_stats=None, val_set_proportion=0.01, processor=None, max_open_episodes=8, validation_panel_size=128, smoke_selection=None):
+    def __init__(self, package_root, cache_root, *, split='train', domain='robocasa', pretrained_norm_stats=None, val_set_proportion=0.01, processor=None, max_open_episodes=8, validation_panel_size=128):
         require(split in ('train', 'val') and domain == 'robocasa', 'Invalid RoboCasa reader split/domain')
         self.root, self.split = (Path(package_root), split)
-        self.package = load_package(self.root, allow_smoke=allow_smoke)
+        self.package = load_package(self.root)
         self.action_space = self.package.get('action_space', 'delta80')
         self.space = package_space(self.package)
         if pretrained_norm_stats is not None:
@@ -213,18 +210,8 @@ class RoboCasaPosttrainDataset(Dataset):
         require(complete['status'] == 'complete' and complete['windows'] == self.visual.plan['windows'], 'Cache must be globally complete')
         self.text = RoboCasaTextCache(self.root, self.package)
         self.entries = [e for e in self.package['episodes'] if e['split'] == split]
-        self.smoke_selection_sha256 = None
-        if smoke_selection:
-            require(allow_smoke, 'Smoke selection cannot be used for formal training')
-            selection = read_json(smoke_selection)
-            keys = set(map(tuple, selection[split]))
-            require(1 <= len(keys) <= 8, 'Smoke selection must contain 1..8 episodes per split')
-            self.entries = [ep for ep in self.entries if (ep['task'], ep['episode']) in keys]
-            require(len(self.entries) == len(keys), 'Smoke selection membership mismatch')
-            self.smoke_selection_sha256 = file_hash(smoke_selection)
-        elif self.package['purpose'] == 'training':
-            from wam.posttrain.robocasa_paths import require_migrated_cache
-            require_migrated_cache(cache_root, sorted({ep['task'] for ep in self.package['episodes']}))
+        from wam.posttrain.robocasa_paths import require_migrated_cache
+        require_migrated_cache(cache_root, sorted({ep['task'] for ep in self.package['episodes']}))
         self.ends = np.cumsum([e['windows'] for e in self.entries]).tolist()
         require(bool(self.ends), 'Empty split')
         self.numeric, self.max_open = (OrderedDict(), int(max_open_episodes))

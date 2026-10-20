@@ -1,6 +1,6 @@
 # Installation
 
-Use an isolated Python 3.10 environment. Install the accelerator-compatible Torch 2.7.1 / torchvision 0.22.1 pair before resolving project dependencies. On PPU, keep the compatible vendor builds and verify dependency resolution before installation.
+Use an isolated Python 3.10 environment. Install the accelerator-compatible Torch 2.7.1 / torchvision 0.22.1 pair before resolving project dependencies. On PPU, keep the compatible vendor builds.
 
 Install a C/C++ compiler and Make for native dependencies (Ubuntu:
 `sudo apt-get install build-essential`). Robosuite's `egl_probe` dependency may
@@ -27,21 +27,17 @@ Install `pip install -e '.[train,logging]'` for training. LIBERO dependencies ar
 
 The LIBERO-Plus integration expects MuJoCo 3.3.2 and Robosuite 1.4.0. Place benchmark assets, BDDL and initialization files in the README's resource layout. No private checkout or machine environment is sourced automatically.
 
-LIBERO-Plus image perturbations require both the Python `Wand` package (included in the `eval` extra) and the system MagickWand library. On Ubuntu 22.04, install `libmagickwand-6.q16-6` with your package manager. Verify in the evaluation environment:
-
-```bash
-python -c 'from wand.api import library; assert library.MagickMotionBlurImage is not None'
-```
+LIBERO-Plus image perturbations require both the Python `Wand` package (included in the `eval` extra) and the system MagickWand library. On Ubuntu 22.04, install `libmagickwand-6.q16-6` with your package manager.
 
 For RoboCasa, install the matching GR1 RoboCasa and Robosuite sources under `resources/robocasa/simulator/`, and prepare its separate interpreter at `resources/robocasa/environments/robocasa-sim/bin/python`, or pass `--sim-python` when preparing evaluation resources. The policy interpreter is independently configurable.
 
-`PPU_SDK_ROOT` is optional and must point to an existing SDK if used. No SDK path is hardcoded. Run preflight and bounded smoke on the target machine before full evaluation.
+`PPU_SDK_ROOT` is optional and must point to an existing SDK if used. No SDK path is hardcoded.
 
 ## Common model resources
 
 Installing Python packages does not download WanVAE, T5 or tokenizer files.
 Before starting evaluation, run the [common-component download commands](../README.md#wanvae-t5-and-tokenizer)
-in the policy environment and follow the [directory layout and offline check](RESOURCES.md#wanvae-t5-and-tokenizer).
+in the policy environment and follow the [directory layout](RESOURCES.md#wanvae-t5-and-tokenizer).
 They use ModelScope for the two converted `.safetensors` files and Hugging Face
 for the tokenizer, matching the released Phoenix inference configs. Evaluation
 launchers are offline and cannot fill in missing downloads automatically.
@@ -51,12 +47,11 @@ Simulator sources/assets must also be prepared separately for the selected bench
 
 LIBERO-Pro uses the project `eval` extra, MuJoCo 3.3.2 and Robosuite 1.4.0. Obtain an external LIBERO-PRO checkout and its official resources following [RESOURCES.md](RESOURCES.md#libero-pro-benchmark). Do not run `pip install -e` on that checkout over LIBERO-Plus: the Pro launcher selects it through an explicit import path in a fresh process. Plus continues to use its bundled integration.
 
-Prepare Pro with `--libero-repo-root` and `--benchmark-root`, then run the public `libero-pro` smoke entry. Use driver-compatible EGL libraries. PPU needs its own compatible SDK/Torch environment. Keep the separate RoboCasa simulator environment unchanged.
+Prepare Pro with `--libero-repo-root` and `--benchmark-root`, then launch [LIBERO-Pro evaluation](EVALUATION.md#libero-pro). Use driver-compatible EGL libraries. PPU needs its own compatible SDK/Torch environment. Keep the separate RoboCasa simulator environment unchanged.
 
 ## Isolated installation
 
-An existing environment passing smoke does not prove a fresh installation works.
-For a clean policy/LIBERO test, use a Python 3.10 interpreter and do not pass
+For an isolated policy/LIBERO installation, use a Python 3.10 interpreter and do not pass
 `--system-site-packages`:
 
 ```bash
@@ -68,31 +63,23 @@ python -m pip install --no-build-isolation egl_probe==1.0.2
 python -m pip install --no-deps torch==2.7.1 torchvision==0.22.1 --index-url https://download.pytorch.org/whl/cu128
 # This next command resolves ALL dependencies, including CUDA runtime packages.
 python -m pip install -e '.[eval,robocasa-policy]'
-env -u PYTHONPATH python -m pip check
-python -c 'import torch, torchvision, mujoco, robosuite; print(torch.__version__, torch.cuda.is_available())'
 ```
 
 Run resource preparation with this environment's Python so `eval.env.sh` records
 the new interpreter. Do not reuse an environment file pointing to an old Python.
-Run the relevant public smoke commands in [EVALUATION.md](EVALUATION.md) with new output
+Use the benchmark commands in [EVALUATION.md](EVALUATION.md) with new output
 directories. RoboCasa's simulator must remain in its own environment; reusing
 external asset files and weights does not require copying Python packages.
 
-Training dependencies (`.[train,logging]`) are separate from evaluation acceptance.
-A policy smoke is not a distributed-training, PPU, or all-Python-version test.
+Install training dependencies separately with `.[train,logging]`.
 The first Torch command only selects the accelerator wheels; do not stop there
-or skip the subsequent complete dependency installation and `pip check`.
+or skip the subsequent complete dependency installation.
 Do not install `decord` merely because it existed in an older environment; it is
 not a declared dependency of this project.
 
-Development regression tests are maintained separately from this public source.
-Validate the installation with `python -m pip check`, then use the benchmark's
-preflight and bounded smoke commands in [EVALUATION.md](EVALUATION.md). For
-training smoke commands, see [TRAINING.md](TRAINING.md). These checks do not
-replace the separate RoboCasa or RoboTwin simulator environments.
 Use a virtual environment without `--system-site-packages`. An offline install
 may use original wheel/source distributions via `--no-index --find-links`, but
-must still resolve dependencies and pass `pip check`; do not copy installed
+must still resolve dependencies; do not copy installed
 packages from an existing environment or bypass dependencies with `--no-deps`.
 
 For an evaluation-only RoboCasa simulator environment, the dependency set is
@@ -107,8 +94,7 @@ through `PYTHONPATH`; this minimal evaluation environment does not install the
 upstream training extras or a second Torch build. It targets Robosuite 1.5.1
 source and the GR1 fork with MuJoCo 3.3.2. Do not apply it to LIBERO, which uses
 Robosuite 1.4.0. Source revisions/assets remain separate prerequisites.
-Clear `PYTHONPATH` for dependency checks: source-tree package metadata must not be
-mistaken for installed policy packages inside the Torch-free simulator environment.
+Keep policy packages out of the separate simulator environment.
 
 ## Rendering backends
 
@@ -197,9 +183,7 @@ fixed by changing `CUDA_VISIBLE_DEVICES`. Driver differences can produce small
 pixel differences. Numeric frozen-scene checks remain required.
 
 SAPIEN can fall back to its bundled Vulkan loader when the system loader is
-absent; this does not supply the NVIDIA driver itself. `vulkaninfo` is an optional
-system diagnostic from `vulkan-tools`, while the actual rollout remains the
-end-to-end renderer check.
+absent; this does not supply the NVIDIA driver itself.
 
 When the container is missing loader manifests but has the matching NVIDIA
 libraries, the repository supplies manifests using library names (not private
@@ -208,14 +192,13 @@ machine paths):
 ```bash
 export VK_ICD_FILENAMES="$PWD/configs/render/nvidia_vulkan.json"
 export __EGL_VENDOR_LIBRARY_FILENAMES="$PWD/configs/render/nvidia_egl.json"
-vulkaninfo --summary
 ```
 
 Explicit manifests are respected by the launcher. These JSON files do not install
 drivers; `libGLX_nvidia.so.0` / `libEGL_nvidia.so.0` must be discoverable. A CPU
 software renderer is not a substitute for the intended NVIDIA backend.
 
-After configuring [RoboTwin resources](ROBOTWIN.md), verify both modes with
-`bash scripts/run_robotwin_smoke.sh eval --gpus 0`. Training needs the policy/training
-dependencies and online encoder weights, not SAPIEN rendering. Successful NVIDIA
-smoke does not certify PPU Vulkan support; validate the target hardware separately.
+After configuring [RoboTwin resources](ROBOTWIN.md), launch both evaluation modes
+using [the full benchmark commands](EVALUATION.md#robotwin-c2c-and-c2r). Training
+uses the policy environment and online encoder weights; it does not require
+SAPIEN rendering.

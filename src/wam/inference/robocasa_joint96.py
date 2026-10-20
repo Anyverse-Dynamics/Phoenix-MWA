@@ -56,7 +56,7 @@ class RoboCasaJoint96Policy:
         self.reset()
 
     @classmethod
-    def from_checkpoint(cls, checkpoint, config, package_root=DEFAULT_PACKAGE, *, device="cuda:0", allow_smoke=False, **kwargs):
+    def from_checkpoint(cls, checkpoint, config, package_root=DEFAULT_PACKAGE, *, device="cuda:0", **kwargs):
         register_default_resolvers()
         cfg = OmegaConf.load(config)
         from wam.posttrain.guard import install_import_guard, validate_scope
@@ -64,7 +64,7 @@ class RoboCasaJoint96Policy:
         validate_scope(cfg)
         from wam.training.robocasa_posttrain import validate_robocasa_config
         validate_robocasa_config(cfg)
-        package = load_inference_package(package_root, allow_smoke=allow_smoke)
+        package = load_inference_package(package_root)
         space = package_space(package)
         require(cfg.joint96_posttrain.robocasa.frame_contract == space.CONTRACT["version"],
                 "Inference config/package action space mismatch")
@@ -73,8 +73,8 @@ class RoboCasaJoint96Policy:
         normalizer = space.RoboCasaNormalizer(read_json(stats_path))
         payload = torch.load(checkpoint, map_location="cpu", mmap=True, weights_only=True)
         saved_contract = payload.get('joint96_metadata', {}).get('soft_prompt', {}).get('training_contract', {})
-        if saved_contract.get('smoke_selection_sha256') and not allow_smoke:
-            raise ValueError('Smoke checkpoint requires explicit allow_smoke; not a formal result')
+        if saved_contract.get('smoke_selection_sha256'):
+            raise ValueError('Diagnostic checkpoint cannot be used for benchmark evaluation')
         validate_checkpoint(payload, package, package_root,
                             expected_pretrain_step=None)
         from wam.utils.checkpoint_steps import checkpoint_steps

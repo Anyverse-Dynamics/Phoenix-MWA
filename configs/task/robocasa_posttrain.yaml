@@ -28,7 +28,7 @@ model:
     soft_prompt_tokens: 8
     embodiment_registry_path: ${local_robot_softprompt.registry_path}
   joint_visual_codec:
-    expected_stvae_step: null # deprecated; read from encoder checkpoint
+    expected_csvae_step: null # deprecated; read from encoder checkpoint
   video_scheduler:
     train_shift: 6.0
     infer_shift: 6.0
@@ -39,7 +39,7 @@ model:
     lambda_video: 1.0
     lambda_action: 1.0
     lambda_vae: 0.5
-    lambda_stvae: 0.5
+    lambda_csvae: 0.5
 batch_size: 8
 gradient_accumulation_steps: 1
 num_workers: 8

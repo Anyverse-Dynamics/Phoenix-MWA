@@ -1,10 +1,9 @@
-"""Versioned, episode-sharded RoboCasa Wan48/STVAE48 sliding-window cache.
+"""Versioned, episode-sharded RoboCasa Wan48/CSVAE48 sliding-window cache.
 
 Only real main-camera latents are stored. The training-facing reader restores
 the two absent camera slots without storing them on disk.
 """
 from __future__ import annotations
-import argparse
 from collections import OrderedDict
 import contextlib
 import fcntl
@@ -129,7 +128,7 @@ def load_plan(path):
 def prepare(args):
     from wam.model.modules.codecs.joint_visual_encoder import encoder_source_sha256
     from wam.training.checkpoint import _joint96_identity
-    paths = {'policy': args.policy, 'vae': args.vae, 'stvae': args.stvae, 'dino': args.dino}
+    paths = {'policy': args.policy, 'vae': args.vae, 'csvae': args.csvae, 'dino': args.dino}
     resources = {}
     for name, path in paths.items():
         path = str(Path(path).resolve(strict=True))
@@ -138,14 +137,12 @@ def prepare(args):
     payload = torch.load(resources['policy']['path'], map_location='cpu', mmap=True, weights_only=True)
     identity = _joint96_identity(payload['joint96_metadata'])
     require(identity['action_dim'] == identity['proprio_dim'] == 80, 'Expected canonical80 policy')
-    require(identity['channel_order'] == ['wan_vae48', 'stvae48'], 'Unexpected visual channel order')
-    source_root = str(Path(args.source_root).resolve(strict=True))
+    require(identity['channel_order'] == ['wan_vae48', 'csvae48'], 'Unexpected visual channel order')
+    source_root = str(args.source_root)
+    encoder_source_sha256(source_root)
     data_root = Path(args.data_root).resolve(strict=True)
     tasks = sorted(data_root.glob('gr1_unified.*'))
     require(len(tasks) == 24, f'Expected 24 RoboCasa tasks, got {len(tasks)}')
-    if args.smoke:
-        names = {'gr1_unified.PnPCupToDrawerClose', 'gr1_unified.PnPMilkToMicrowaveClose', 'gr1_unified.PosttrainPnPNovelFromTrayToPlateSplitA'}
-        tasks = [p for p in tasks if p.name in names]
     episodes, metadata = ([], [])
     for root in tasks:
         info = read_json(root / 'meta/info.json')
@@ -158,7 +155,7 @@ def prepare(args):
         require(len(rows) == info['total_episodes'], 'Episode count mismatch')
         require(sum((int(row['length']) for row in rows)) == info['total_frames'], 'Frame count mismatch')
         require(len({r['episode_index'] for r in rows}) == len(rows), 'Duplicate episode IDs')
-        for row in sorted(rows, key=lambda r: r['episode_index'])[:1 if args.smoke else None]:
+        for row in sorted(rows, key=lambda r: r['episode_index']):
             ep, length = (int(row['episode_index']), int(row['length']))
             if length <= 4:
                 continue
@@ -168,12 +165,8 @@ def prepare(args):
                 path = root / info['video_path' if kind == 'video' else 'data_path'].format(**fmt)
                 entry[kind] = str(path)
                 entry[kind + '_identity'] = file_identity(path)
-            if args.smoke:
-                entry['starts'] = sorted({0, 1, (length - 4) // 2, length - 33, length - 5})
-                require(min(entry['starts']) >= 0, 'Smoke needs an episode of at least 33 frames')
-                entry['windows'] = len(entry['starts'])
             episodes.append(entry)
-    plan = {'schema': SCHEMA, 'scope': 'smoke' if args.smoke else 'full24_all_episodes', 'resources': resources, 'source_root': source_root, 'source_sha256': identity['source_sha256'], 'encoder_identity': {k: v for k, v in identity.items() if k != 'soft_prompt'}, 'metadata': metadata, 'data_root': str(data_root), 'episodes': episodes, 'windows': sum((e['windows'] for e in episodes)), 'feature_shape': list(SHAPE), 'dtype': 'bfloat16', 'storage_dtype': 'uint16', 'camera': CAMERA, 'camera_is_pad': [False, True, True], 'rgb_offsets': OFFSETS.tolist(), 'stride': 1, 'minimum_real_future_offset': 4, 'tail_policy': 'repeat_last_rgb_with_explicit_padding_masks', 'rgb_preprocessing': 'pyav_rgb24_256_uint8_div255_float32_times2_minus1_then_bf16', 'augmentation': 'none', 'posterior': 'mean', 'torch_version': str(torch.__version__), 'visual_attention_backend': 'math_sdpa', 'implementation': implementation_identity()}
+    plan = {'schema': SCHEMA, 'scope': 'full24_all_episodes', 'resources': resources, 'source_root': source_root, 'source_sha256': identity['source_sha256'], 'encoder_identity': {k: v for k, v in identity.items() if k != 'soft_prompt'}, 'metadata': metadata, 'data_root': str(data_root), 'episodes': episodes, 'windows': sum((e['windows'] for e in episodes)), 'feature_shape': list(SHAPE), 'dtype': 'bfloat16', 'storage_dtype': 'uint16', 'camera': CAMERA, 'camera_is_pad': [False, True, True], 'rgb_offsets': OFFSETS.tolist(), 'stride': 1, 'minimum_real_future_offset': 4, 'tail_policy': 'repeat_last_rgb_with_explicit_padding_masks', 'rgb_preprocessing': 'pyav_rgb24_256_uint8_div255_float32_times2_minus1_then_bf16', 'augmentation': 'none', 'posterior': 'mean', 'torch_version': str(torch.__version__), 'visual_attention_backend': 'math_sdpa', 'implementation': implementation_identity()}
     plan['sha256'] = digest(plan)
     target = Path(args.plan)
     with locked(target.with_suffix('.lock')):
@@ -231,7 +224,7 @@ class CacheEncoder:
             require(file_identity(resource['path']) == {k: resource[k] for k in ('size', 'mtime_ns')}, f"Checkpoint changed since prepare: {resource['path']}")
         self.vae = _load_registered_model(r['vae']['path'], 'wan_video_vae', torch_dtype=torch.bfloat16, device=str(self.device))
         source = plan['source_root']
-        cfg = {'source_root': source, 'source_sha256': plan['source_sha256'], 'stvae_checkpoint_path': r['stvae']['path'], 'expected_stvae_step': 150000, 'dino_kwargs': {'checkpoint_path': r['dino']['path'], 'checkpoint_state': 'ema_student', 'output_source': 'backbone', 'projection_mode': 'raw', 'projector_out_dim': 1024, 'starvla_source_path': source + '/third_party/dino_runtime', 'dinov3_source_path': source + '/third_party/dino_runtime/dinov3', 'dinov3_source_commit': plan['encoder_identity']['dinov3_source_commit'], 'verify_source_commit': True, 'strict_load': True, 'image_size': 256, 'patch_size': 16}}
+        cfg = {'source_root': source, 'source_sha256': plan['source_sha256'], 'csvae_checkpoint_path': r['csvae']['path'], 'expected_csvae_step': None, 'dino_kwargs': {'checkpoint_path': r['dino']['path'], 'checkpoint_state': 'ema_student', 'output_source': 'backbone', 'projection_mode': 'raw', 'projector_out_dim': 1024, 'dinov3_source_commit': plan['encoder_identity']['dinov3_source_commit'], 'verify_source_commit': False, 'strict_load': True, 'image_size': 256, 'patch_size': 16}}
         self.encoder = JointVisualEncoder.from_config(cfg, vae=self.vae, device=self.device)
         self.pad = torch.tensor([[False, True, True]], device=self.device)
         self.runtime = {'torch': str(torch.__version__), 'cuda': torch.version.cuda, 'device': torch.cuda.get_device_name(self.device), 'encoder': 'JointVisualEncoder.encode', 'camera_slots': 3, 'window_batch_size': 1, 'visual_attention_backend': 'math_sdpa'}
@@ -282,18 +275,11 @@ class RoboCasaVisualCache:
         require(bool(torch.isfinite(value).all()), 'Nonfinite cached feature')
         return {'video_latents': torch.cat((value, torch.zeros_like(value), torch.zeros_like(value)), dim=-1), 'video_shape': torch.tensor([3, 3, 9, 256, 256]), 'camera_is_pad': torch.tensor([False, True, True]), 'image_is_pad': torch.tensor(mapping['image_is_pad']), 'mapping': mapping}
 
-def compare(actual, expected, *, atol=0.0, rtol=0.0):
-    a, b = (actual.float(), expected.float())
-    require(a.shape == b.shape, 'Comparison shapes differ')
-    delta = (a - b).abs()
-    return {'passed': bool(torch.isclose(a, b, atol=atol, rtol=rtol).all()), 'atol': atol, 'rtol': rtol, 'max_abs': float(delta.max()), 'unequal': int((a != b).sum())}
-
 def extract(args):
     plan = load_plan(args.plan)
     implementation_audit = validate_implementation(plan, args.resume_compat)
     require(plan['torch_version'] == str(torch.__version__), 'Torch runtime differs from prepared plan')
     root = Path(args.output)
-    require(not args.verify_online or plan['scope'] == 'smoke', 'Online verification is reserved for a bounded smoke plan')
     episodes = assigned_episodes(plan, args.rank, args.world_size)
     root.mkdir(parents=True, exist_ok=True)
     with locked(root / f'rank_{args.rank:05d}.lock'):
@@ -316,7 +302,6 @@ def extract(args):
         print(f'[rank={args.rank}] assigned={len(episodes)} skipped={skipped} pending={len(pending)}', flush=True)
         start_time = time.monotonic()
         runtime = CacheEncoder(plan, args.device) if pending else None
-        cache = RoboCasaVisualCache(root, args.plan)
         total = 0
         for episode in pending:
             folder = episode_output(root, episode)
@@ -328,24 +313,12 @@ def extract(args):
                 tmp = folder / 'features.partial.bin'
                 array = np.memmap(tmp, mode='w+', dtype=np.uint16, shape=(episode['windows'], *SHAPE))
                 checks = []
-                online_values = []
                 t0 = time.monotonic()
                 for row, frame in enumerate(starts_for(episode)):
                     mapping = window_mapping(episode['length'], frame)
                     rgb = pack_rgb(images, mapping)
                     value = runtime.encode(rgb)
                     array[row] = value.view(torch.uint16).numpy()
-                    if args.verify_online:
-                        from wam.datasets.lerobot.lerobot.datasets.video_utils import decode_video_frames
-                        ref = decode_video_frames(episode['video'], timestamps[mapping['frame_indices']].tolist(), TIMESTAMP_ATOL_SECONDS, backend='pyav')
-                        ref_rgb = rgb.clone()
-                        ref_rgb[0, 0] = ref.permute(1, 0, 2, 3).mul(2).sub(1)
-                        checks.append({'frame': frame, 'rgb_vs_training_decoder': compare(rgb, ref_rgb), 'cache_vs_online': compare(value, runtime.encode(ref_rgb))})
-                        online_values.append(value)
-                        if row == 0:
-                            current = runtime.encode(rgb[:, :, :, :1])
-                            checks[-1]['wan_current_prefix'] = compare(current[:48], value[:48, :1])
-                            checks[-1]['stvae_current_prefix'] = compare(current[48:], value[48:, :1], atol=0.01, rtol=0.01)
                     if row == 0 or (row + 1) % args.log_every == 0:
                         print(f"[rank={args.rank}] {episode['task']} ep={episode['episode']} {row + 1}/{episode['windows']} elapsed={time.monotonic() - t0:.1f}s", flush=True)
                 array.flush()
@@ -353,19 +326,10 @@ def extract(args):
                 with tmp.open('rb') as stream:
                     os.fsync(stream.fileno())
                 check_episode_source(episode)
-                if args.verify_online:
-                    atomic_json(folder / 'SMOKE_CHECKS.json', {'plan_sha256': plan['sha256'], 'checks': checks})
-                require(all((c['passed'] for check in checks for c in check.values() if isinstance(c, dict))), 'Smoke parity failed')
                 target = folder / 'features.bf16.bin'
                 os.replace(tmp, target)
                 receipt = {'schema': SCHEMA, 'plan_sha256': plan['sha256'], 'episode_sha256': digest(episode), 'rows': episode['windows'], 'feature_shape': list(SHAPE), 'features_sha256': file_hash(target), 'rank': args.rank, 'runtime': runtime.runtime, 'elapsed_s': time.monotonic() - t0, 'checks': checks, 'extraction_implementation': implementation_audit}
                 atomic_json(folder / 'COMPLETE.json', receipt)
-                if args.verify_online:
-                    for frame, expected in zip(starts_for(episode), online_values):
-                        item = cache.get(episode['task'], episode['episode'], frame)
-                        require(torch.equal(item['video_latents'][..., :16], expected), 'Cache readback differs')
-                        require(not item['video_latents'][..., 16:].count_nonzero(), 'Reader padding differs')
-                    atomic_json(folder / 'SMOKE_READBACK.json', {'passed': True, 'rows': len(online_values), 'plan_sha256': plan['sha256']})
                 total += episode['windows']
                 atomic_json(root / f'progress_rank_{args.rank:05d}.json', {'plan_sha256': plan['sha256'], 'extracted_windows': total, 'last_task': episode['task'], 'last_episode': episode['episode'], 'elapsed_s': time.monotonic() - start_time})
         atomic_json(root / f'rank_{args.rank:05d}.json', {'plan_sha256': plan['sha256'], 'world_size': args.world_size, 'rank': args.rank, 'episodes': len(episodes), 'skipped_episodes': skipped, 'new_windows': total, 'elapsed_s': time.monotonic() - start_time, 'status': 'complete'})
@@ -382,51 +346,12 @@ def verify(args):
             continue
         receipt = validate_complete(args.output, episode, plan['sha256'], verify_hash=args.hash_all)
         check_episode_source(episode)
-        if args.require_smoke:
-            require(bool(receipt['checks']), 'Missing online smoke checks')
-            require(all((c['passed'] for check in receipt['checks'] for c in check.values() if isinstance(c, dict))), 'Failed parity check')
-            readback = read_json(folder / 'SMOKE_READBACK.json')
-            require(readback['passed'] and readback['rows'] == episode['windows'], 'Missing smoke readback')
         count += episode['windows']
         runtimes.add(digest(receipt['runtime']))
     require(len(runtimes) <= 1, 'Mixed hardware/software encoding runtimes in cache')
-    summary = {'schema': SCHEMA, 'plan_sha256': plan['sha256'], 'status': 'complete' if not missing else 'incomplete', 'windows': count, 'expected_windows': plan['windows'], 'missing_episodes': len(missing), 'missing_preview': missing[:20], 'hash_all': args.hash_all, 'smoke_verified': args.require_smoke}
+    summary = {'schema': SCHEMA, 'plan_sha256': plan['sha256'], 'status': 'complete' if not missing else 'incomplete', 'windows': count, 'expected_windows': plan['windows'], 'missing_episodes': len(missing), 'missing_preview': missing[:20], 'hash_all': args.hash_all}
     print(json.dumps(summary, indent=2), flush=True)
     if not missing:
         atomic_json(Path(args.output) / 'COMPLETE.json', summary)
     require(not missing or args.allow_incomplete, 'Cache incomplete')
 
-def main():
-    parser = argparse.ArgumentParser(description=__doc__)
-    sub = parser.add_subparsers(dest='command', required=True)
-    prep = sub.add_parser('prepare')
-    prep.add_argument('--plan', required=True)
-    prep.add_argument('--data-root', default=DEFAULT_DATA)
-    prep.add_argument('--source-root', required=True, help='Encoder source tree used to prepare the cache')
-    prep.add_argument('--policy', default=DEFAULT_WEIGHTS + '/policy/robot37_step_072500.pt')
-    prep.add_argument('--stvae', default=DEFAULT_WEIGHTS + '/visual/stvae_step_150000_compat.pt')
-    prep.add_argument('--dino', default=DEFAULT_WEIGHTS + '/visual/dino_step_00110000.pt')
-    prep.add_argument('--vae', default=DEFAULT_VAE)
-    prep.add_argument('--smoke', action='store_true')
-    run = sub.add_parser('extract')
-    run.add_argument('--plan', required=True)
-    run.add_argument('--output', required=True)
-    run.add_argument('--rank', type=int, default=int(os.environ.get('RANK', 0)))
-    run.add_argument('--world-size', type=int, default=int(os.environ.get('WORLD_SIZE', 1)))
-    run.add_argument('--device', default='cuda:0')
-    run.add_argument('--verify-online', action='store_true')
-    run.add_argument('--log-every', type=int, default=50)
-    run.add_argument('--resume-compat', default=None)
-    resume = sub.add_parser('check-resume')
-    resume.add_argument('--plan', required=True)
-    resume.add_argument('--resume-compat', default=None)
-    check = sub.add_parser('verify')
-    check.add_argument('--plan', required=True)
-    check.add_argument('--output', required=True)
-    check.add_argument('--hash-all', action='store_true')
-    check.add_argument('--require-smoke', action='store_true')
-    check.add_argument('--allow-incomplete', action='store_true')
-    args = parser.parse_args()
-    {'prepare': prepare, 'extract': extract, 'verify': verify, 'check-resume': check_resume}[args.command](args)
-if __name__ == '__main__':
-    main()

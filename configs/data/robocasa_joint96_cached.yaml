@@ -14,8 +14,6 @@ train:
   pretrained_norm_stats: ${data.train.package_root}/norm.json
   domain: robocasa
   split: train
-  allow_smoke: false
-  smoke_selection: null
   val_set_proportion: 0.01
   processor:
     action_output_dim: 80
@@ -28,7 +26,5 @@ val:
   pretrained_norm_stats: ${data.train.pretrained_norm_stats}
   domain: robocasa
   split: val
-  allow_smoke: ${data.train.allow_smoke}
-  smoke_selection: ${data.train.smoke_selection}
   val_set_proportion: ${data.train.val_set_proportion}
   processor: ${data.train.processor}

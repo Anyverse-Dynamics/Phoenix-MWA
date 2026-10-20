@@ -556,7 +556,7 @@ def _joint96_training_loss(model, sample, *, tiled: bool):
     from wam.model.modules.conditioning.embodiment_prompt import action_prompt_kwargs
     inputs = build_wam_inputs(model, sample, tiled=tiled)
     if float(model.loss_lambda_video) != 1.0 or float(model.loss_lambda_action) != 1.0:
-        raise ValueError("joint96 requires lambda_video=lambda_action=1 (0.5 VAE + 0.5 STVAE + action).")
+        raise ValueError("joint96 requires lambda_video=lambda_action=1 (0.5 VAE + 0.5 CSVAE + action).")
     if bool(getattr(model.action_expert, "training_time_rtc_enabled", False)):
         raise ValueError("joint96 does not enable training-time RTC prefixes.")
     if bool(getattr(model.video_expert, "action_conditioned", False)):
@@ -670,20 +670,20 @@ def _joint96_training_loss(model, sample, *, tiled: bool):
     loss_vae, mse_vae = _joint96_masked_mse(
         pred_video[:, :48], target_video[:, :48, 1:], future_valid, video_weight, name="VAE",
     )
-    loss_stvae, mse_stvae = _joint96_masked_mse(
-        pred_video[:, 48:], target_video[:, 48:, 1:], future_valid, video_weight, name="STVAE",
+    loss_csvae, mse_csvae = _joint96_masked_mse(
+        pred_video[:, 48:], target_video[:, 48:, 1:], future_valid, video_weight, name="CSVAE",
     )
     loss_action, mse_action = _joint96_masked_mse(
         pred_action, target_action, action_valid,
         model.train_action_scheduler.training_weight(timestep_action), name="action",
     )
-    loss_video = 0.5 * (loss_vae + loss_stvae)
+    loss_video = 0.5 * (loss_vae + loss_csvae)
     return loss_video + loss_action, {
         "loss_video": loss_video.detach(), "loss_action": loss_action.detach(),
-        "loss_vae": 0.5 * loss_vae.detach(), "loss_stvae": 0.5 * loss_stvae.detach(),
+        "loss_vae": 0.5 * loss_vae.detach(), "loss_csvae": 0.5 * loss_csvae.detach(),
         # Raw branch losses include timestep weighting, but not the 0.5 coefficients.
-        "loss_vae_raw": loss_vae.detach(), "loss_stvae_raw": loss_stvae.detach(),
-        "mse_vae": mse_vae, "mse_stvae": mse_stvae, "mse_action": mse_action,
+        "loss_vae_raw": loss_vae.detach(), "loss_csvae_raw": loss_csvae.detach(),
+        "mse_vae": mse_vae, "mse_csvae": mse_csvae, "mse_action": mse_action,
     }
 
 

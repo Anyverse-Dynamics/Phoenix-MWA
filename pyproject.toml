@@ -64,5 +64,5 @@ where = ["src"]
 include = ["wam*"]
 
 [tool.setuptools.package-data]
-"wam.model.modules.codecs.dino_stvae" = ["*.json"]
+"wam.model.modules.codecs.dino_csvae" = ["*.json"]
 "wam.third_party" = ["dino_runtime/**/*.py", "dino_runtime/dinov3/.source-commit", "dino_runtime/dinov3/LICENSE.md", "dino_runtime/STARVLA-LICENSE"]

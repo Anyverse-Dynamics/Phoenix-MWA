@@ -44,8 +44,8 @@ from .utils.video_metrics import pil_frames_to_video_tensor, video_psnr, video_s
 logger = get_logger(__name__)
 
 _JOINT96_PANEL_LOSS_KEYS = (
-    "val_loss", "loss_video", "loss_action", "loss_vae", "loss_stvae",
-    "loss_vae_raw", "loss_stvae_raw",
+    "val_loss", "loss_video", "loss_action", "loss_vae", "loss_csvae",
+    "loss_vae_raw", "loss_csvae_raw",
 )
 
 

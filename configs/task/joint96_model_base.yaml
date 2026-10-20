@@ -7,9 +7,6 @@ local_robot_joint96:
   enabled: false
   expected_world_size: 192
   require_deepspeed: true
-  smoke_mode: false
-  allow_audit_package: false
-  allow_smoke_norm: false
   validation_seed: 20260928
 
 batch_size: 16
@@ -94,10 +91,10 @@ model:
   distillation:
     enabled: false
   joint_visual_codec:
-    source_root: bundled://dino-stvae-v1
+    source_root: bundled://dino-csvae-v2
     source_sha256: null
-    stvae_checkpoint_path: ${oc.env:STVAE_CHECKPOINT}
-    expected_stvae_step: null # deprecated; read from encoder checkpoint
+    csvae_checkpoint_path: ${oc.env:CSVAE_CHECKPOINT}
+    expected_csvae_step: null # deprecated; read from encoder checkpoint
     dino_kwargs:
       checkpoint_path: ${oc.env:DINO_ENCODER_CHECKPOINT}
       checkpoint_state: ema_student

@@ -2,7 +2,7 @@
 
 Spatiotemporal variational autoencoder.
 Original SHA256: 7ac8c86e332467aa03d639e84831685f0c72f9aa882acb66551066e47095cfc4.
-Architecture and state-dict names are unchanged for STVAE-90k compatibility.
+Architecture and tensor layout are retained in the CSVAE checkpoint format.
 
 Spatial blocks retain OpenWAM SVAE's parameter layout. Temporal operations are
 Wan-inspired, independently implemented (no spatial downsampling or Wan weights).
@@ -17,8 +17,8 @@ from torch import nn
 from torch.nn import functional as F
 from torch.utils.checkpoint import checkpoint
 
-MODEL_TYPE = "spatial_transformer_temporal_vae"
-FORMAT_VERSION = 1
+MODEL_TYPE = "causal_semantic_vae"
+FORMAT_VERSION = 2
 
 
 class ChannelRMSNorm(nn.Module):
@@ -118,7 +118,7 @@ def spatial_block(dim, heads, intermediate_size, dropout):
     )
 
 
-class STVAE(nn.Module):
+class CSVAE(nn.Module):
     def __init__(
         self,
         input_dim=1024,
@@ -307,7 +307,7 @@ class STVAE(nn.Module):
         )
 
 
-def stvae_loss(out, beta=1e-4, cos_weight=1.0):
+def csvae_loss(out, beta=1e-4, cos_weight=1.0):
     recon, target = out["recon"].float(), out["target"].float()
     if recon.shape != target.shape:
         raise ValueError("reconstruction/target shape mismatch")
@@ -321,15 +321,15 @@ def stvae_loss(out, beta=1e-4, cos_weight=1.0):
     }
 
 
-def load_stvae(path, device="cpu"):
-    """Load model-only stvae.pt with weights_only=True; reject plain S-VAE."""
+def load_csvae(path, device="cpu"):
+    """Load model-only csvae.pt with weights_only=True; reject plain S-VAE."""
     payload = torch.load(Path(path), map_location="cpu", weights_only=True)
     if (
         payload.get("model_type") != MODEL_TYPE
         or payload.get("format_version") != FORMAT_VERSION
     ):
-        raise ValueError("not a supported ST-VAE checkpoint")
-    model = STVAE(**payload["model_config"])
+        raise ValueError("not a supported CS-VAE checkpoint")
+    model = CSVAE(**payload["model_config"])
     model.load_state_dict(payload["state_dict"], strict=True)
     return model.to(device).eval().requires_grad_(False)
 

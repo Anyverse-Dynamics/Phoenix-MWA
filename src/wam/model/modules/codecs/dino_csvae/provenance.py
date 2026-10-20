@@ -1,7 +1,7 @@
 """Bundled encoder paths. Runtime file fingerprints are not required."""
 from pathlib import Path
 
-BUNDLED_SOURCE = "bundled://dino-stvae-v1"
+BUNDLED_SOURCE = "bundled://dino-csvae-v2"
 PACKAGE = Path(__file__).resolve().parent
 WAM_ROOT = PACKAGE.parents[3]
 RUNTIME = WAM_ROOT / "third_party/dino_runtime"
@@ -9,7 +9,7 @@ RUNTIME = WAM_ROOT / "third_party/dino_runtime"
 
 def verify_bundle():
     """Retained API name; check required source files, not their hashes."""
-    for path in (PACKAGE / 'online_dinov3_stvae_encoder.py', PACKAGE / 'stvae.py',
+    for path in (PACKAGE / 'online_dinov3_csvae_encoder.py', PACKAGE / 'csvae.py',
                  RUNTIME / 'STARVLA-LICENSE', RUNTIME / 'dinov3/LICENSE.md'):
         if not path.is_file():
             raise FileNotFoundError(path)

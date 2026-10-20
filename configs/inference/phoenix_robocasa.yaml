@@ -1,5 +1,5 @@
 # Phoenix-MWA RoboCasa inference configuration. Not a training recipe.
-# Encoders: DINO110k EMA + STVAE150k.
+# Encoders: DINO110k EMA + CSVAE150k.
 # Use tools/prepare_eval.py --config with explicit checkpoint/encoder/resource flags.
 # Relative paths are rooted at the repository. The preparer relocates runtime resources.
 # data.train/val retain only processor and compatibility fields; datasets are not loaded.
@@ -46,7 +46,6 @@ data:
     package_root: resources/robocasa-package
     cache_root: null
     pretrained_norm_stats: ${inference.normalization_stats}
-    allow_smoke: false
     processor:
       action_output_dim: 80
       proprio_output_dim: 80
@@ -58,7 +57,6 @@ data:
     package_root: resources/robocasa-package
     cache_root: null
     pretrained_norm_stats: ${inference.normalization_stats}
-    allow_smoke: false
     processor:
       action_output_dim: 80
       proprio_output_dim: 80
@@ -131,7 +129,7 @@ model:
     lambda_video: 1.0
     lambda_action: 1.0
     lambda_vae: 0.5
-    lambda_stvae: 0.5
+    lambda_csvae: 0.5
   future_delta:
     enabled: false
   understanding:
@@ -158,12 +156,12 @@ model:
   distillation:
     enabled: false
   joint_visual_codec:
-    source_root: bundled://dino-stvae-v1
+    source_root: bundled://dino-csvae-v2
     source_sha256: null
-    stvae_checkpoint_path: checkpoints/encoders/stvae150k.pt
-    expected_stvae_step: 150000
+    csvae_checkpoint_path: resources/encoders/csvae.pt
+    expected_csvae_step: 150000
     dino_kwargs:
-      checkpoint_path: checkpoints/encoders/dino110k.pt
+      checkpoint_path: resources/encoders/dino110k.pt
       checkpoint_state: ema_student
       output_source: backbone
       projection_mode: raw
@@ -171,8 +169,8 @@ model:
       projector_state_path: null
       feature_norm_state_path: null
       require_feature_norm: false
-      starvla_source_path: bundled://dino-stvae-v1/third_party/dino_runtime
-      dinov3_source_path: bundled://dino-stvae-v1/third_party/dino_runtime/dinov3
+      starvla_source_path: bundled://dino-csvae-v2/third_party/dino_runtime
+      dinov3_source_path: bundled://dino-csvae-v2/third_party/dino_runtime/dinov3
       dinov3_source_commit: 6876159a11b4df116f30f667f8c9888617df0751
       verify_source_commit: false
       strict_load: true

@@ -5,23 +5,26 @@
 <p align="center"><strong>Phoenix-MWA: Learning Generalizable World–Action Models with Structural and Semantic Representations</strong></p>
 
 <p align="center">
+  <a href="https://openphoenix-team.github.io/Phoenix-pages/"><img src="https://img.shields.io/badge/Project%20Page-Blog post-blue?style=flat&amp;logo=github" alt="Project Page"></a>
   <a href="https://huggingface.co/collections/OpenPhoenix/phoenix-mwa"><img src="https://img.shields.io/badge/HuggingFace-Model%20%26%20Data-orange?style=flat&amp;logo=huggingface" alt="Model &amp; Data on Hugging Face"></a>
 </p>
 
-## Roadmap
+<p align="center">
+  <a href="#model-zoo">Model Zoo</a> ·
+  <a href="#getting-started">Getting Started</a> ·
+  <a href="#training">Training</a> ·
+  <a href="#evaluation">Evaluation</a> ·
+  <a href="docs/RESOURCES.md">Resources</a>
+</p>
 
-- [ ] Data pipeline *(Coming soon)*
-- [ ] Pre-training code and model weights *(Coming soon)*
-- [x] Post-training code and model weights
-- [x] Evaluation on LIBERO-Plus, LIBERO-Pro and RoboCasa GR1
-- [x] Evaluation on RoboTwin 2.0 C2C & C2R
-- [ ] Evaluation on RoboDojo (sim & real) *(Coming soon)*
+This is the **post-train branch of Phoenix-MWA**, providing **post-training code, model weights and benchmark evaluation code**. For world–action pretraining, see the [main branch](https://github.com/OpenPhoenix-Team/Phoenix-MWA/tree/main).
 
-## Overview
+Available and planned releases include:
 
-![Phoenix-MWA model architecture](docs/assets/main.png)
-
-Phoenix-MWA combines 48-channel Wan video latents and 48-channel CS-VAE latents into a 96-channel visual representation, with canonical 80-dimensional action/state representations and embodiment-conditioned action prediction.
+- [x] LIBERO-Plus, LIBERO-Pro and RoboCasa GR1
+- [x] RoboTwin 2.0 C2C & C2R
+- [ ] RoboDojo (sim & real) *(Coming soon)*
+- [ ] Bench2Dex *(Coming soon)*
 
 ## Model Zoo
 
@@ -33,6 +36,7 @@ Phoenix-MWA combines 48-channel Wan video latents and 48-channel CS-VAE latents 
 | RoboTwin 2.0 (Preview) | [Hugging Face](https://huggingface.co/OpenPhoenix/Phoenix-RoboTwin) | 86.54% (Clean2Clean); 72.42% (Clean2Random) |
 | RoboDojo-Sim (Preview) | Coming soon... 🏗️ 🚧 🔨 | — |
 | RoboDojo-RealWorld (Preview) | Coming soon... 🏗️ 🚧 🔨 | — |
+| Bench2Dex (Preview) | Coming soon... 🏗️ 🚧 🔨 | — |
 
 ## Getting started
 
@@ -67,11 +71,7 @@ host graphics driver. See [system prerequisites and pinned dependencies](docs/IN
 | `eval/` | Benchmark policy and simulator adapters |
 | `third_party/` | Benchmark integration code and licenses |
 | `assets/` | Normalization statistics and task selection metadata |
-| `tools/` | Resource preparation, validation and source packaging |
-
-The public source includes bounded smoke entrypoints and runtime compatibility
-checks. Development regression suites and migration-only tools are maintained
-separately and are not included in the deployment archive.
+| `tools/` | Evaluation resource preparation |
 
 ## Prepare data and weights
 
@@ -80,7 +80,8 @@ directory layouts and the distinction between available resources and pending re
 
 | Relative location | Contents |
 | --- | --- |
-| `checkpoints/` | Wan components, DINO/STVAE encoders and initialization weights |
+| `checkpoints/` | Wan components, policy and initialization weights |
+| `resources/encoders/` | Shared `dino110k.pt` and `csvae.pt` encoder weights |
 | `data/libero_mujoco3.3.2/` | FastWAM's four preprocessed LIBERO LeRobot v2.1 suites |
 | `data/robocasa/` | RoboCasa GR1 LeRobot episodes |
 | `data/cache/` | Text and paired visual latent caches |
@@ -147,7 +148,7 @@ Keep the repository-ID subdirectories; do not flatten the files or rename
 official `.pth` files to `.safetensors`. The published LIBERO/RoboCasa/RoboTwin policy
 checkpoints already restore both DiTs: their evaluation does **not** require
 FastWAM's ActionDiT preprocessing step or a separate download of Wan DiT shards.
-See [full directory layout, offline checks and troubleshooting](docs/RESOURCES.md#wanvae-t5-and-tokenizer).
+See [full directory layout and troubleshooting](docs/RESOURCES.md#wanvae-t5-and-tokenizer).
 
 ### LIBERO training data
 
@@ -232,7 +233,7 @@ RUN_ID=robotwin_run NNODES=1 NPROC_PER_NODE=8 EXPECTED_WORLD_SIZE=8 \
   bash scripts/train_robotwin.sh
 ```
 
-See [training and smoke commands](docs/TRAINING.md) for all three recipes and
+See [training commands](docs/TRAINING.md) for all three recipes and
 multi-node settings. Use a new run name for each independent training run.
 
 ## Evaluation
@@ -254,12 +255,11 @@ pretraining initialization checkpoint is needed for this inference entry.
 
 #### Required frozen snapshot download
 
-**Download and extract the frozen snapshots before running RoboTwin evaluation,
-including smoke tests.** They are separate from policy weights and simulator
+**Download and extract the frozen snapshots before running RoboTwin evaluation.**
+They are separate from policy weights and simulator
 assets; the evaluation launcher does not download or generate them.
-The HF locations below are release destinations; anonymous access returned 401
-during the release audit. Upload/access must be completed before these download
-commands work. A source-code update does not publish the external files.
+The policy repository and both frozen archives must be accessible before using
+the download commands below.
 
 | Mode | Required archive | Download |
 | --- | --- | --- |
@@ -297,10 +297,9 @@ bash scripts/eval_robotwin.sh --mode c2r --gpus 0,1,2,3,4,5,6,7
 ```
 
 Each mode covers 50 tasks × 100 frozen episodes, using unseen instructions,
-32-action chunks/replanning and 10 denoising steps. For one complete episode
-per mode, use `bash scripts/run_robotwin_smoke.sh eval --gpus 0`.
+32-action chunks/replanning and 10 denoising steps.
 Online-visual post-training is available through `scripts/train_robotwin.sh`;
-see [training settings and smoke](docs/ROBOTWIN.md#training).
+see [training settings](docs/ROBOTWIN.md#training).
 
 ### LIBERO-Plus
 
@@ -309,7 +308,7 @@ EVAL_GPUS=0,1,2,3,4,5,6,7 \
   bash scripts/evaluate.sh libero-plus resources/libero/eval.env.sh
 ```
 
-Full mode covers the 10,030 tasks registered by the bundled benchmark, with one episode per task. Instructions come from BDDL, initial states from the benchmark, and 10 actions are executed per 32-action prediction. Add `smoke` for one task per suite, or `preflight` for resource validation without policy rollouts.
+Full mode covers the 10,030 tasks registered by the bundled benchmark, with one episode per task. Instructions come from BDDL, initial states from the benchmark, and 10 actions are executed per 32-action prediction.
 
 ### LIBERO-Pro
 
@@ -317,10 +316,10 @@ Prepare its own resource environment file as described in [LIBERO-Pro preparatio
 
 ```bash
 EVAL_GPUS=0,1,2,3,4,5,6,7 \
-  bash scripts/evaluate.sh libero-pro resources/libero-pro-run/eval.env.sh
+  bash scripts/evaluate.sh libero-pro resources/libero-pro-full/eval.env.sh
 ```
 
-Use a separate LIBERO-PRO checkout and official four-case resources; see [preparation](docs/EVALUATION.md#libero-pro). Full mode runs 160 tasks × 50 official initial states across Object, Position, Semantic and Task perturbations (8,000 episodes). Add `smoke` for 16 episodes covering all suite/perturbation combinations. The Environment category is not included.
+Use a separate LIBERO-PRO checkout and official four-case resources; see [preparation](docs/EVALUATION.md#libero-pro). Full mode runs 160 tasks × 50 official initial states across Object, Position, Semantic and Task perturbations (8,000 episodes). The Environment category is not included.
 
 Instructions come from BDDL `:language`; each trial uses its corresponding official initial state. The protocol uses seed 42, 30 settling steps, chunk 32 and replan 10. See [evaluation details](docs/EVALUATION.md#libero-pro).
 
@@ -331,10 +330,6 @@ NUM_GPUS_TOTAL=8 N_EPISODES=50 \
   bash scripts/evaluate.sh robocasa-gr1 resources/robocasa-eval/eval.env.sh
 ```
 
-This evaluates 24 GR1 tasks with a 720-step episode cap and 12 executed actions per replan. A saved scene-seed manifest fixes the episode layout protocol. Add `smoke` for one episode of the first task only, or `preflight` for simulator/resource checks. File hashes are not checked. Tensor shapes, action conventions and finite values are checked at runtime.
+This evaluates 24 GR1 tasks with a 720-step episode cap and 12 executed actions per replan. A saved scene-seed manifest fixes the episode layout protocol. Tensor shapes, action conventions and finite values are checked at runtime.
 
-Use a fresh runtime/output directory for each independent run. Runtime-generated configuration may contain resolved local paths and is excluded from source releases. Weight-dependent smoke validation on the target hardware remains required.
-
-## Acknowledgements
-
-We acknowledge FastWAM, Wan, DINOv3, StarVLA, LeRobot, LIBERO, LIBERO-Plus, LIBERO-Pro, RoboTwin and RoboCasa. Original copyright notices are retained. Project code uses `LICENSE`; bundled components retain their own terms, including the DINOv3 License. This is not a blanket MIT license for all dependencies, weights, datasets or robot assets. See `NOTICE` and `LICENSES/`.
+Use a fresh runtime/output directory for each independent run. Runtime-generated configuration may contain resolved local paths and is excluded from source releases.

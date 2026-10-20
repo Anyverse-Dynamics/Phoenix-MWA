@@ -17,28 +17,25 @@ with normalization from [`robotwin.json`](../assets/stats/robotwin.json). The
 numerical statistics match the released FT35k policy's original statistics.
 No original training YAML, training dataset, pretraining checkpoint or training
 T5 cache is required. The policy encodes the frozen episode's actual instruction
-online and caches it in memory per session. DINO/STVAE implementation is bundled
+online and caches it in memory per session. DINO/CSVAE implementation is bundled
 in source; only their weights are separate downloads.
 
 | Location | Required release content |
 | --- | --- |
 | `OpenPhoenix/Phoenix-RoboTwin` | `policy.pt`, the two frozen archives below and `MANIFEST.json` |
-| `OpenPhoenix/Phoenix-Encoders` | Shared `dino110k.pt`, `stvae150k.pt` |
+| `OpenPhoenix/Phoenix-Encoders` | Shared `dino110k.pt`, `csvae.pt` |
 | This source checkout | Inference YAML, normalization, simulator patches/version manifest, evaluator |
 | Pinned upstream downloads | Simulator, CuRobo, robot/object/texture assets, WanVAE, T5 and tokenizer |
 
-Project-hosted file destinations are not a claim that upload has finished:
-anonymous access to the two frozen archive URLs returned HTTP 401 during the
-release audit. Publish/fix access before using the download commands. No upload
-is performed by these source changes. The frozen packages may be placed in an
-HF dataset instead, but weights alone cannot reproduce this frozen protocol.
+The policy repository and both frozen archives must be accessible before using
+the download commands. Weights alone cannot reproduce this frozen protocol.
 
 Once the policy repository is accessible, download into the expected layout:
 
 ```bash
 hf download OpenPhoenix/Phoenix-RoboTwin policy.pt --local-dir checkpoints/robotwin
-hf download OpenPhoenix/Phoenix-Encoders dino110k.pt stvae150k.pt \
-  --local-dir checkpoints/encoders
+hf download OpenPhoenix/Phoenix-Encoders dino110k.pt csvae.pt \
+  --local-dir resources/encoders
 ```
 
 Download [common WanVAE/T5/tokenizer files](../README.md#wanvae-t5-and-tokenizer)
@@ -56,8 +53,7 @@ Reproduce the simulator we used, not an arbitrary current upstream checkout:
 | CuRobo 0.7.8 | `d64c4b005459db10c5dd867d8b30a87d5bda9bdb` plus `assets/robotwin/curobo.patch` |
 | `TianxingChen/RoboTwin2.0` assets | `9dc9299c163db059931898a9f0852098a61155a1` |
 
-These identities come from the deployed evaluator, source comparison and asset
-download receipts. The patches retain five RoboTwin source/config changes
+The patches retain five RoboTwin source/config changes
 (deterministic instruction RNG, Python RNG seeding, non-mutating clutter bounds,
 safe planner initialization and evaluation configs) and four CuRobo planner
 config changes (`use_cuda_kernel: false`). Do not discard these modifications
@@ -77,7 +73,6 @@ git -C "$ROBOTWIN_ROOT" fetch --depth 1 \
   https://github.com/RoboTwin-Platform/RoboTwin.git \
   13c3c47ff4312dd62484bcd51be034af55c062d1
 git -C "$ROBOTWIN_ROOT" checkout --detach FETCH_HEAD
-git -C "$ROBOTWIN_ROOT" apply --check "$PWD/assets/robotwin/robotwin.patch"
 git -C "$ROBOTWIN_ROOT" apply "$PWD/assets/robotwin/robotwin.patch"
 
 mkdir -p "$ROBOTWIN_ROOT/envs/curobo"
@@ -85,7 +80,6 @@ git -C "$ROBOTWIN_ROOT/envs/curobo" init
 git -C "$ROBOTWIN_ROOT/envs/curobo" fetch --depth 1 \
   https://github.com/NVlabs/curobo.git d64c4b005459db10c5dd867d8b30a87d5bda9bdb
 git -C "$ROBOTWIN_ROOT/envs/curobo" checkout --detach FETCH_HEAD
-git -C "$ROBOTWIN_ROOT/envs/curobo" apply --check "$PWD/assets/robotwin/curobo.patch"
 git -C "$ROBOTWIN_ROOT/envs/curobo" apply "$PWD/assets/robotwin/curobo.patch"
 
 hf download TianxingChen/RoboTwin2.0 --repo-type dataset \
@@ -98,7 +92,6 @@ hf download TianxingChen/RoboTwin2.0 --repo-type dataset \
     unzip -n "$archive"
   done
 )
-python tools/check_robotwin_resources.py --root "$ROBOTWIN_ROOT" --archives
 ```
 
 Install `git` and `unzip`, and run downloads in an online shell (unset
@@ -107,19 +100,13 @@ Install `git` and `unzip`, and run downloads in an online shell (unset
 Keep upstream licenses with these dependencies. Asset downloads are not training
 demonstrations and need not be uploaded again to the Phoenix model repository.
 
-`assets/robotwin/simulator_manifest.json` records exact source/config tree digests,
-the three archive hashes and three key ARX5 asset-file hashes. The checker is an
-optional installation audit, not a new runtime gate. `--source-only` checks source
-before downloading assets; `--archives` additionally hashes the three zip files.
-The default does not hash every extracted mesh or texture. Byte checks do not
-replace the scene/policy smoke on the target GPU. After preparing resources,
-follow the [separate simulator environment install](INSTALLATION.md#robotwin-environment).
+After preparing resources, follow the [separate simulator environment install](INSTALLATION.md#robotwin-environment).
 
 ## Training
 
 The recipe reads all 2,500 clean RoboTwin LeRobot episodes (the first 50 episodes
 of each 550-episode task block). Three cameras are resized and cropped to 256×256;
-RGB augmentation and frozen DINO110k/STVAE150k encoding run online. Text features
+RGB augmentation and frozen DINO110k/CSVAE150k encoding run online. Text features
 come from a task-indexed T5 cache with prompt identity validation. Native joint14
 actions/state map into canonical80. ARX5 uses embodiment slot 2 of the original
 28-slot, eight-token prompt table. There is no memory conditioning.
@@ -128,7 +115,7 @@ Default settings: 8 nodes × 8 GPUs, batch 8/GPU, accumulation 1 (global batch 5
 50 epochs, AdamW/cosine LR 5e-5 → 5e-7, warmup derived as 5% of the schedule,
 seed 42, BF16/ZeRO-1, no gradient checkpointing, save/evaluate every 5,000 steps.
 Initialization is weights-only, with a fresh optimizer and scheduler. The source step is read from the checkpoint for reporting only.
-The model predicts 32 actions; total loss is action + 0.5 Wan-VAE + 0.5 STVAE.
+The model predicts 32 actions; total loss is action + 0.5 Wan-VAE + 0.5 CSVAE.
 Training-pool evaluation is diagnostic, not a held-out validation score.
 
 ```bash
@@ -138,17 +125,10 @@ RUN_ID=robotwin_posttrain NNODES=8 NPROC_PER_NODE=8 EXPECTED_WORLD_SIZE=64 \
 ```
 
 Run on every node with scheduler-provided `NODE_RANK`/`RANK` and `MASTER_ADDR`.
-For a local four-GPU, two-update smoke (batch 1/GPU):
-
-```bash
-source configs/machines/robotwin.example.sh
-bash scripts/run_robotwin_smoke.sh train
-```
-
 ## Required frozen snapshot download
 
 **The frozen snapshot for the selected mode must be downloaded and extracted
-before any evaluation, including smoke tests.** Download both packages when
+before evaluation.** Download both packages when
 running C2C and C2R. Policy weights, simulator assets and a seed-only list do not
 replace these inputs. The launcher does not download or regenerate them.
 
@@ -206,8 +186,6 @@ Configure paths after sourcing the machine example, before launching evaluation:
 source configs/machines/robotwin.example.sh
 export ROBOTWIN_FROZEN_C2C="resources/robotwin/frozen/c2c"
 export ROBOTWIN_FROZEN_C2R="resources/robotwin/frozen/c2r"
-test -f "$ROBOTWIN_FROZEN_C2C/SPEC.json"
-test -f "$ROBOTWIN_FROZEN_C2R/SPEC.json"
 ```
 
 The machine example already uses this directory layout. If storing snapshots
@@ -233,26 +211,10 @@ bash scripts/eval_robotwin.sh --mode c2r --gpus 0,1,2,3,4,5,6,7
 One immutable policy runtime is loaded per GPU. Tasks are assigned round-robin.
 The horizon and replan interval are both 32; inference uses 10 denoising steps
 and policy seed 0. Current-only visual encoding retains the reference
-`repeat9_full_stvae` adapter. Simulator step limits are not shortened for smoke.
-
-```bash
-source configs/machines/robotwin.example.sh
-bash scripts/run_robotwin_smoke.sh eval --gpus 0
-```
-
-To run the four-GPU training smoke followed by both evaluation modes in one command:
-
-```bash
-ROBOTWIN_ENV_FILE=configs/machines/robotwin.example.sh bash scripts/run_robotwin_smoke.sh all
-```
+`repeat9_full_csvae` adapter and each task's original simulator step limit.
 
 For long remote sessions, redirect the driver to a log and use `nohup` or `tmux`;
 the model and simulator logs are also saved inside each evaluation output folder.
-
-Smoke uses original task 0 / episode 0 in each mode, not newly selected seeds.
-It validates execution, not benchmark performance. Scene-only diagnostics are
-available with `python tools/check_robotwin_scene.py --mode c2c` and are not
-policy test results.
 
 File hashes and fixed checkpoint steps are not checked. Model schema, encoder semantics, tensor
 keys/shapes, restored tensor equality, camera ordering and action mapping are
@@ -262,7 +224,7 @@ reported separately because rendering may differ across hardware. This does not
 claim bit-identical A100 images; changed object layouts fail scene validation.
 Technical errors abort the run and never become task failures or replacement seeds.
 
-All outputs live under ignored `validation_runs/` or `runs/`; checkpoints and
+All outputs live under ignored `runs/evaluation/robotwin/`; checkpoints and
 private deployment paths live under ignored `resources/`. Public defaults read
 `ROBOTWIN_INFERENCE_CONFIG` and `ROBOTWIN_EVAL_STATS` from source. Explicit CLI
 paths override the environment. `ROBOTWIN_TRAIN_CONFIG` and the shared server's

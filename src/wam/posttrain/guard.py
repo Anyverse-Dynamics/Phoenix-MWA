@@ -42,9 +42,6 @@ def validate_scope(cfg):
         validate_robocasa_config(cfg)
         if select('joint96_posttrain.robocasa.frame_contract') != CONTRACT['version']:
             raise ValueError('Only RoboCasa Delta80 slot18 is supported')
-        if select('data.train.allow_smoke', False):
-            if select('max_steps') not in (1, 2, 3) or select('batch_size') != 1:
-                raise ValueError('RoboCasa smoke is bounded to B1 and at most 3 updates')
     domain = 'robotwin' if robotwin else ('robocasa' if robocasa else 'libero')
     reader = ('wam.datasets.robotwin_joint96_robot37.RobotwinJoint96OnlineDataset' if robotwin
               else 'wam.datasets.robocasa_posttrain.RoboCasaPosttrainDataset' if robocasa
@@ -54,5 +51,5 @@ def validate_scope(cfg):
             raise ValueError('Use the explicit benchmark reader and domain')
     if (not robotwin and not select('joint96_posttrain.cached_visuals')) or select('video_latent_cache', 'off') != 'off':
         raise ValueError('Native visual cache generation is not part of this release')
-    if select('model.joint_visual_codec.source_root') != 'bundled://dino-stvae-v1':
+    if select('model.joint_visual_codec.source_root') != 'bundled://dino-csvae-v2':
         raise ValueError('External encoder source roots are not allowed')

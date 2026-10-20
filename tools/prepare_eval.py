@@ -46,7 +46,7 @@ def prepare(args):
     from wam.utils.config_resolvers import register_default_resolvers
     register_default_resolvers()
     checkpoint, config = existing(args.checkpoint), existing(args.config)
-    dino, stvae, model_base = existing(args.dino), existing(args.stvae), existing(args.model_base)
+    dino, csvae, model_base = existing(args.dino), existing(args.csvae), existing(args.model_base)
     cfg = OmegaConf.load(config)
     payload = torch.load(checkpoint, map_location='cpu', mmap=True, weights_only=True)
     from wam.utils.checkpoint_steps import checkpoint_steps
@@ -85,17 +85,17 @@ def prepare(args):
         'local_robot_softprompt.init_checkpoint': None,
         'local_robot_softprompt.registry_path': str(registry),
         'model.action_dit_config.embodiment_registry_path': str(registry),
-        'model.joint_visual_codec.source_root': 'bundled://dino-stvae-v1',
+        'model.joint_visual_codec.source_root': 'bundled://dino-csvae-v2',
         'model.joint_visual_codec.source_sha256': None,
-        'model.joint_visual_codec.stvae_checkpoint_path': str(stvae),
+        'model.joint_visual_codec.csvae_checkpoint_path': str(csvae),
         'model.joint_visual_codec.dino_kwargs.checkpoint_path': str(dino),
-        'model.joint_visual_codec.dino_kwargs.starvla_source_path': 'bundled://dino-stvae-v1/third_party/dino_runtime',
-        'model.joint_visual_codec.dino_kwargs.dinov3_source_path': 'bundled://dino-stvae-v1/third_party/dino_runtime/dinov3',
+        'model.joint_visual_codec.dino_kwargs.starvla_source_path': 'bundled://dino-csvae-v2/third_party/dino_runtime',
+        'model.joint_visual_codec.dino_kwargs.dinov3_source_path': 'bundled://dino-csvae-v2/third_party/dino_runtime/dinov3',
         'model.joint_visual_codec.dino_kwargs.verify_source_commit': False,
     }
     env = dict(PYTHON=sys.executable, POLICY_PYTHON=sys.executable,
                DIFFSYNTH_MODEL_BASE_PATH=str(model_base), DINO_ENCODER_CHECKPOINT=str(dino),
-               STVAE_CHECKPOINT=str(stvae), EVAL_RENDER_BACKEND=args.render_backend,
+               CSVAE_CHECKPOINT=str(csvae), EVAL_RENDER_BACKEND=args.render_backend,
                MUJOCO_GL=args.render_backend, PYOPENGL_PLATFORM=args.render_backend)
     output.mkdir(parents=True)
     if args.benchmark in ('libero-plus', 'libero-pro'):
@@ -142,7 +142,7 @@ def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--benchmark',choices=('libero-plus','libero-pro','robocasa-gr1'),required=True)
     p.add_argument('--libero-repo-root', help='External LIBERO-PRO checkout (not installed over LIBERO-Plus)')
-    for name in ('checkpoint','config','dino','stvae','model-base','output'):
+    for name in ('checkpoint','config','dino','csvae','model-base','output'):
         p.add_argument('--'+name,required=True)
     p.add_argument('--stats', help='LIBERO statistics (required), or an explicit RoboCasa inference statistics override')
     p.add_argument('--benchmark-root',default='third_party/LIBERO-plus/libero/libero')

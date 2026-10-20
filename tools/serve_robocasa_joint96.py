@@ -33,14 +33,13 @@ def main():
     p.add_argument("--denoising-steps", type=int, default=10)
     p.add_argument("--seed", type=int, default=7)
     p.add_argument("--idle-timeout", type=int, default=1800)
-    p.add_argument("--allow-smoke", action="store_true")
     p.add_argument("--sim-root", default=str(Path(__file__).resolve().parents[1] / "third_party/robocasa_runner"))
     a = p.parse_args()
     sys.path.append(str(Path(a.sim_root).resolve(strict=True)))
     from deployment.model_server.tools.websocket_policy_server import WebsocketPolicyServer
     from wam.inference.robocasa_joint96 import RoboCasaJoint96Policy
     policy = RoboCasaJoint96Policy.from_checkpoint(a.checkpoint, a.config, a.package, device=a.device,
-        allow_smoke=a.allow_smoke, execute_steps=a.execute_steps, num_inference_steps=a.denoising_steps, seed=a.seed)
+        execute_steps=a.execute_steps, num_inference_steps=a.denoising_steps, seed=a.seed)
     server = WebsocketPolicyServer(policy=ServerAdapter(policy), host=a.host, port=a.port, idle_timeout=a.idle_timeout,
         metadata={"policy": f"robocasa_{policy.action_space}_joint_v1", "embodiment_id": policy.embodiment_id,
                   "action_dim": policy.action_dim, "execute_steps": a.execute_steps,

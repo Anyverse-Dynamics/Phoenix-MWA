@@ -17,8 +17,8 @@ joint96_posttrain:
 
 model:
   joint_visual_codec:
-    expected_stvae_step: null # deprecated; read from encoder checkpoint
-    stvae_checkpoint_path: ${oc.env:STVAE_CHECKPOINT}
+    expected_csvae_step: null # deprecated; read from encoder checkpoint
+    csvae_checkpoint_path: ${oc.env:CSVAE_CHECKPOINT}
   action_dit_config:
     num_embodiments: 28
     soft_prompt_tokens: 8

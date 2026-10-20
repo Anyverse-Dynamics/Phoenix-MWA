@@ -1,10 +1,14 @@
 #!/usr/bin/env bash
 # Explicit NVIDIA/Accelerate entrypoint. Does not start unless invoked.
 set -euo pipefail
+if [[ "${ROBOCASA_SMOKE:-0}" != 0 || -n "${ROBOCASA_SMOKE_SELECTION:-}" ]]; then
+    echo 'RoboCasa smoke runs moved to Phoenix-devtools; refusing to start formal training.' >&2
+    exit 2
+fi
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 : "${PYTHON:?}" "${RUN_ID:?Use a new run name}" "${ROBOCASA_PACKAGE:?}" "${ROBOCASA_CACHE:?}"
-: "${WAM_PRETRAIN_CHECKPOINT:?}" "${STVAE_CHECKPOINT:?}" "${DINO_ENCODER_CHECKPOINT:?}" "${DIFFSYNTH_MODEL_BASE_PATH:?}"
+: "${WAM_PRETRAIN_CHECKPOINT:?}" "${CSVAE_CHECKPOINT:?}" "${DINO_ENCODER_CHECKPOINT:?}" "${DIFFSYNTH_MODEL_BASE_PATH:?}"
 export ROBOCASA_REGISTRY="$ROOT/configs/embodiment_registry/robocasa_gr1_delta80_slot18_v1.json"
 export PATH="$(dirname "$PYTHON"):$PATH" PYTHONPATH="$ROOT/src:$ROOT"
 export PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1
@@ -24,23 +28,12 @@ if (( NNODES > 1 )); then : "${MASTER_ADDR:?}"; fi
 OUT="${WAM_OUTPUT_ROOT:-$ROOT/runs}/robocasa/$RUN_ID"
 ENTRY=scripts/train.py
 ARGS=(task=robocasa_posttrain "output_dir=$OUT")
-if [[ "${ROBOCASA_SMOKE:-0}" == 1 ]]; then
-    [[ "$WORLD" == 4 && "$NNODES" == 1 ]]
-    : "${ROBOCASA_SMOKE_SELECTION:?}"
-    ENTRY=scripts/smoke_train_robocasa.py
-    ARGS+=(batch_size=1 gradient_accumulation_steps=1 max_steps=3 num_epochs=50
-           num_workers=0 log_every=1 save_every=0 eval_every=0 save_training_state=false
-           save_on_train_end=true max_weight_checkpoints=1 wandb.enabled=false
-           data.train.allow_smoke=true "data.train.smoke_selection=$ROBOCASA_SMOKE_SELECTION")
-    [[ "$#" == 0 ]] || { echo 'No extra overrides in bounded smoke' >&2; exit 2; }
-else
-    for arg in "$@"; do
-        key="${arg%%=*}"; key="${key#++}"; key="${key#+}"; key="${key#~}"
-        case "$key" in output_dir|task|resume|hydra.run.dir|hydra.sweep.dir|data.train.allow_smoke|data.train.smoke_selection)
-            echo "Reserved override: $key" >&2; exit 2;; esac
-    done
-    ARGS+=("$@")
-fi
+for arg in "$@"; do
+    key="${arg%%=*}"; key="${key#++}"; key="${key#+}"; key="${key#~}"
+    case "$key" in output_dir|task|resume|hydra.run.dir|hydra.sweep.dir)
+        echo "Reserved override: $key" >&2; exit 2;; esac
+done
+ARGS+=("$@")
 [[ ! -e "$OUT" ]] || { echo "Refusing existing output: $OUT" >&2; exit 2; }
 LAUNCH=("$PYTHON" -m accelerate.commands.launch
     --config_file scripts/accelerate_configs/accelerate_joint96_posttrain_zero1.yaml
@@ -48,5 +41,5 @@ LAUNCH=("$PYTHON" -m accelerate.commands.launch
     --main_process_ip "${MASTER_ADDR:-127.0.0.1}" --main_process_port "${MASTER_PORT:-24621}"
     --deepspeed_multinode_launcher standard "$ENTRY" "${ARGS[@]}")
 if [[ "${DRY_RUN:-0}" == 1 ]]; then printf '%q ' "${LAUNCH[@]}"; printf '\n'; exit 0; fi
-if [[ "${ROBOCASA_SMOKE:-0}" != 1 ]]; then "$PYTHON" tools/preflight_robocasa.py "$@"; fi
+"$PYTHON" -c 'import sys; from wam.posttrain.resources import validate_launch; validate_launch("robocasa", sys.argv[1:])' "${ARGS[@]:1}"
 exec "${LAUNCH[@]}"

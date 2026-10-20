@@ -13,7 +13,7 @@ requires a matching set, not just a policy tensor file:
 
 - LIBERO: `policy.pt`, `configs/inference/phoenix_libero.yaml`,
   `assets/stats/phoenix_libero.json`,
-  DINO and CS-VAE/STVAE weights, plus the Wan/text/tokenizer components required
+  DINO and CS-VAE weights, plus the Wan/text/tokenizer components required
   by that configuration.
 - RoboCasa: the same model components, `configs/inference/phoenix_robocasa.yaml`,
   source statistics `assets/stats/phoenix_robocasa.json`, and the included
@@ -24,6 +24,23 @@ requires a matching set, not just a policy tensor file:
   and assets are still external resources.
 - Use the configuration, normalization statistics and encoders supplied for the
   selected policy.
+
+The shared encoder filenames are `dino110k.pt` and `csvae.pt`. Download them to
+the paths used by all three inference configurations:
+
+```bash
+hf download OpenPhoenix/Phoenix-Encoders dino110k.pt csvae.pt \
+  --local-dir resources/encoders
+```
+
+The CSVAE payload uses `model_type: causal_semantic_vae` and `format_version: 2`.
+The version describes checkpoint serialization; it does not identify a new model
+architecture. Both Phoenix pretraining and Phoenix-MWA use the policy weight
+schema `phoenix.local_joint96.weights.v1`, with `csvae` metadata and the bundled
+source URI `bundled://dino-csvae-v2`. Use the matching released policy and encoder
+files; changing a filename alone does not convert an earlier payload.
+The inference launchers check model semantics and tensor structure, while runtime
+file hashes and fixed encoder steps remain disabled.
 
 Example layout:
 
@@ -41,7 +58,6 @@ assets/robocasa/
 checkpoints/
   libero/policy.pt
   robocasa/policy.pt
-  {dino.pt,stvae.pt}
   DiffSynth-Studio/Wan-Series-Converted-Safetensors/
     Wan2.2_VAE.safetensors
     models_t5_umt5-xxl-enc-bf16.safetensors
@@ -51,6 +67,7 @@ checkpoints/
     tokenizer.json
     tokenizer_config.json
 resources/
+  encoders/{dino110k.pt,csvae.pt}
   robocasa/{simulator/,environments/}
 ```
 
@@ -113,45 +130,7 @@ files under `Wan-AI/Wan2.2-TI2V-5B` instead and are **not** the configuration
 covered by these commands; do not change that flag just to suppress a missing
 file error.
 
-### Offline resource check
-
-After download, run this from the repository root in the policy environment.
-It uses the same resolver and tokenizer as inference without loading the large
-weight tensors, accessing a GPU, launching simulation or downloading anything:
-
-```bash
-DIFFSYNTH_SKIP_DOWNLOAD=true HF_HUB_OFFLINE=1 \
-PYTHONPATH="$PWD/src:$PWD${PYTHONPATH:+:$PYTHONPATH}" python - <<'PY'
-from pathlib import Path
-from omegaconf import OmegaConf
-from wam.model.backbones.wan22.helpers.loader import _resolve_configs
-from wam.model.backbones.wan22.wan_video_text_encoder import HuggingfaceTokenizer
-
-for name in ('libero', 'robocasa'):
-    cfg = OmegaConf.load(f'configs/inference/phoenix_{name}.yaml').model
-    _, text, vae, tokenizer = _resolve_configs(
-        cfg.model_id, cfg.tokenizer_model_id, cfg.redirect_common_files)
-    for label, component in (('WanVAE', vae), ('T5', text), ('tokenizer', tokenizer)):
-        component.download_if_necessary()  # Offline: raises on missing paths.
-        path = Path(component.path)
-        if label == 'tokenizer':
-            assert path.is_dir(), path
-        else:
-            assert path.is_file() and path.stat().st_size > 0, path
-        print(name, label, path)
-    tok = HuggingfaceTokenizer(
-        tokenizer.path, seq_len=128, clean='whitespace', local_files_only=True)
-    ids, mask = tok(['pick up the cup'], return_mask=True, add_special_tokens=True)
-    assert ids.shape == mask.shape == (1, 128) and bool(mask.any())
-print('PASS: component paths and tokenizer; model/simulator smoke still required')
-PY
-```
-
-This checks presence and tokenizer readability, not weight integrity or numerical
-parity. The policy, DINO/STVAE encoders, source inference config/statistics and
-benchmark assets are still needed for the subsequent smoke in [EVALUATION.md](EVALUATION.md).
-
-Common setup errors:
+### Troubleshooting
 
 - `No model files match ...`: check `--model-base`, the exact filenames and
   repository-ID subdirectories. Download in a network-enabled shell first;
@@ -184,16 +163,17 @@ task classification come from the benchmark checkout. Prepare evaluation with:
 python tools/prepare_eval.py --benchmark libero-plus \
   --checkpoint checkpoints/libero/policy.pt --config configs/inference/phoenix_libero.yaml \
   --stats assets/stats/phoenix_libero.json \
-  --dino checkpoints/dino.pt --stvae checkpoints/stvae.pt --model-base checkpoints \
+  --dino resources/encoders/dino110k.pt --csvae resources/encoders/csvae.pt --model-base checkpoints \
   --benchmark-root resources/LIBERO-plus/libero/libero --output resources/libero
-bash scripts/evaluate.sh libero-plus resources/libero/eval.env.sh smoke
+EVAL_GPUS=0,1,2,3,4,5,6,7 \
+  bash scripts/evaluate.sh libero-plus resources/libero/eval.env.sh full
 ```
 
 Install the project `eval` extra, not a second competing `libero` package. The
 launcher imports the bundled integration while resource paths point to the
 downloaded benchmark. Follow [INSTALLATION.md](INSTALLATION.md) for system EGL
-and MagickWand dependencies. Third-party license completion is deferred and is
-not certified by the installation/smoke checks described here.
+and MagickWand dependencies. Retain the upstream license notices
+for the benchmark and downloaded assets.
 
 ## LIBERO-Pro benchmark
 
@@ -203,7 +183,7 @@ Obtain the external [LIBERO-PRO code](https://github.com/Zxy-MLlab/LIBERO-PRO) w
 git clone https://github.com/Zxy-MLlab/LIBERO-PRO.git resources/LIBERO-PRO
 ```
 
-Download the official BDDL and initialization resources from [zhouxueyang/LIBERO-Pro](https://huggingface.co/datasets/zhouxueyang/LIBERO-Pro). The validated four-case data release is `c86fc3b8293185a6f373677018ff3e37f8391602`. Follow the upstream asset instructions for the simulator meshes/textures. Retain original task names and all 50 initial states per task; do not substitute LIBERO-Plus initial states.
+Download the official BDDL and initialization resources from [zhouxueyang/LIBERO-Pro](https://huggingface.co/datasets/zhouxueyang/LIBERO-Pro). The four-case data revision is `c86fc3b8293185a6f373677018ff3e37f8391602`. Follow the upstream asset instructions for the simulator meshes/textures. Retain original task names and all 50 initial states per task; do not substitute LIBERO-Plus initial states.
 
 Arrange the resources as follows (directory symlinks are supported):
 
@@ -239,9 +219,6 @@ ROBOCASA_SIM_PYTHON="$PWD/resources/robocasa/environments/robocasa-sim/bin/pytho
   cd resources/robocasa/simulator/robocasa-gr1-tabletop-tasks
   "$ROBOCASA_SIM_PYTHON" robocasa/scripts/download_tabletop_assets.py -y
 )
-# Record the actual source revisions alongside your evaluation results.
-git -C resources/robocasa/simulator/robosuite rev-parse HEAD
-git -C resources/robocasa/simulator/robocasa-gr1-tabletop-tasks rev-parse HEAD
 ```
 
 Robosuite is pinned to tag `v1.5.1`, not an arbitrary newer checkout. The GR1
@@ -255,7 +232,7 @@ follow its download/license prompts. When preparing evaluation, use
 `--resources resources/robocasa` and
 `--sim-python resources/robocasa/environments/robocasa-sim/bin/python`.
 Do not install its Robosuite over the LIBERO environment. Match source revisions
-and assets to the selected benchmark release and run smoke before full evaluation.
+and assets to the selected benchmark release.
 
 Original demonstrations are available at
 [NVIDIA PhysicalAI Robotics GR00T Teleop Sim](https://huggingface.co/datasets/nvidia/PhysicalAI-Robotics-GR00T-Teleop-Sim).
@@ -329,7 +306,7 @@ locations below are placeholders for matching resources, not bundled downloads:
 | `ROBOTWIN_EVAL_STATS` | Source: `assets/stats/robotwin.json` |
 
 Also supply the policy-side WanVAE/T5/tokenizer components and matching frozen
-DINO/STVAE weights. Evaluation strictly restores both DiTs from the complete
+DINO/CSVAE weights. Evaluation strictly restores both DiTs from the complete
 policy; it does not load a pretraining checkpoint or original Wan DiT shards.
 Online T5 needs no prebuilt training cache. `ROBOTWIN_TRAIN_CONFIG` remains a
 legacy fallback when no new inference config is specified.
@@ -354,5 +331,5 @@ Minimal project-hosted release files are `policy.pt`, both frozen archives and
 their manifest; the inference config and normalization belong in source, and
 the two encoders are reused from `OpenPhoenix/Phoenix-Encoders`. The frozen
 archives can instead be hosted in a separate HF dataset, but cannot be omitted
-from reproduction of this protocol. Their documented HF URLs were not yet
-anonymously downloadable at the release audit (HTTP 401).
+from reproduction of this protocol. Obtain access to both archives before
+launching evaluation.

@@ -1,5 +1,5 @@
 # Phoenix-MWA RoboTwin inference configuration; not a training recipe.
-# Released policy: FT35k, DINO110k EMA + STVAE150k.
+# Released policy: FT35k, DINO110k EMA + CSVAE150k.
 # data.train contains only processor/compatibility fields; no dataset is loaded.
 # Paths are relative to the repository, with explicit environment overrides.
 # Preserve constructor checks; the evaluator skips Wan DiT initialization weights
@@ -241,12 +241,12 @@ model:
   distillation:
     enabled: false
   joint_visual_codec:
-    source_root: bundled://dino-stvae-v1
+    source_root: bundled://dino-csvae-v2
     source_sha256: null
-    stvae_checkpoint_path: checkpoints/encoders/stvae150k.pt
-    expected_stvae_step: 150000
+    csvae_checkpoint_path: resources/encoders/csvae.pt
+    expected_csvae_step: 150000
     dino_kwargs:
-      checkpoint_path: checkpoints/encoders/dino110k.pt
+      checkpoint_path: resources/encoders/dino110k.pt
       checkpoint_state: ema_student
       output_source: backbone
       projection_mode: raw
@@ -254,8 +254,8 @@ model:
       projector_state_path: null
       feature_norm_state_path: null
       require_feature_norm: false
-      starvla_source_path: bundled://dino-stvae-v1/third_party/dino_runtime
-      dinov3_source_path: bundled://dino-stvae-v1/third_party/dino_runtime/dinov3
+      starvla_source_path: bundled://dino-csvae-v2/third_party/dino_runtime
+      dinov3_source_path: bundled://dino-csvae-v2/third_party/dino_runtime/dinov3
       dinov3_source_commit: 6876159a11b4df116f30f667f8c9888617df0751
       verify_source_commit: false
       strict_load: true

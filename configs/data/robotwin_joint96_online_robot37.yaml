@@ -3,7 +3,7 @@ defaults:
   - robotwin
   - _self_
 
-# Preserve Joint96 three-view geometry; encode online with STVAE150k/DINO110k.
+# Preserve Joint96 three-view geometry; encode online with CSVAE150k/DINO110k.
 video_size: [256, 256]
 processor:
   num_output_cameras: 3

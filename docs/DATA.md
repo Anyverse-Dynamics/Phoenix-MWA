@@ -17,7 +17,7 @@ RGB offsets are 0,4,...,32; action offsets are 0,...,31.
 Wan (48 channels) and CS-VAE (48 channels) form the 96-channel visual representation. Text/visual caches and completion/binding manifests must match the encoder weights and data metadata. Cache generation is a separate preparation step, not an implicit training side effect.
 
 The FastWAM dataset download does not include those caches. Keep
-`LIBERO_TEXT_CACHE`, `LIBERO_WAN_VAE_CACHE`, `LIBERO_STVAE_CACHE` and
+`LIBERO_TEXT_CACHE`, `LIBERO_WAN_VAE_CACHE`, `LIBERO_CSVAE_CACHE` and
 `LIBERO_PAIR_BINDING` configured separately; changing the dataset path does not
 regenerate or rebind an existing cache.
 

@@ -28,7 +28,7 @@ class AuditedSession(Robot37Joint96Session):
                 action_shape=list(action.shape), finite=True,
                 isolated_session=True, inference_seed=self.seed, replan=self.replan_steps,
                 denoise=self.num_inference_steps)
-            record['inference_current_visual_mode'] = 'repeat9_full_stvae'
+            record['inference_current_visual_mode'] = 'repeat9_full_csvae'
             temp = self.audit_output / f'.FIRST_ACTION.{os.getpid()}.tmp'
             temp.write_text(json.dumps(record, indent=2) + '\n')
             temp.replace(self.audit_output / 'FIRST_ACTION.json')
@@ -63,7 +63,7 @@ def main():
     assert not sock.exists() and len(str(sock).encode()) < 100
     runtime, config = build_runtime(a.checkpoint, a.inference_config, a.dataset_stats,
         expected_step=a.expected_step, output_dir=a.output_dir, denoise=a.denoise,
-        replan=a.replan, seed=a.seed, current_visual_mode='repeat9_full_stvae')
+        replan=a.replan, seed=a.seed, current_visual_mode='repeat9_full_csvae')
     listener = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     server = None
     try:

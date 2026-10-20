@@ -1,7 +1,7 @@
-"""Explicit inference-only adapter for the frozen DINO/STVAE encoder.
+"""Explicit inference-only adapter for the frozen DINO/CSVAE encoder.
 
 Install after semantic checkpoint validation. Only the
-STVAE branch is wrapped; the caller's Wan encoder is not changed.
+CSVAE branch is wrapped; the caller's Wan encoder is not changed.
 """
 
 from pathlib import Path
@@ -10,7 +10,7 @@ import types
 import torch
 
 
-MODE = 'repeat9_full_stvae'
+MODE = 'repeat9_full_csvae'
 
 
 def configure_current_visual(model, mode='auto'):
@@ -24,14 +24,14 @@ def configure_current_visual(model, mode='auto'):
     if mode == MODE:
         if conditioning != 'legacy_clip_prefix':
             raise ValueError('repeat9 requires legacy_clip_prefix training identity')
-        install_current_repeat9(visual.stvae_encoder)
+        install_current_repeat9(visual.csvae_encoder)
     return {
         'mode': mode,
         'training_current_conditioning': conditioning,
         'adapter_path': str(Path(__file__).resolve()),
         'runtime_hash_validation': False,
         'repeat_frames': 9 if mode == MODE else None,
-        'slice_after': 'full_stvae' if mode == MODE else None,
+        'slice_after': 'full_csvae' if mode == MODE else None,
         'wan_branch_changed': False,
     }
 

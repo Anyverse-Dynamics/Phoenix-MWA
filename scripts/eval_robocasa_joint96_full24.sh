@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 # Bound concurrent task workers while preserving the legacy rank-to-GPU assignment.
 set -euo pipefail
+if [[ -n "${ROBOCASA_TASK_LIMIT:-}" || "${PREFLIGHT_ONLY:-0}" != 0
+      || "${ROBOCASA_DIAGNOSTIC_SMOKE:-0}" != 0 || "${ALLOW_SMOKE:-0}" != 0 ]]; then
+    echo 'RoboCasa diagnostic selection moved to Phoenix-devtools; refusing to expand it into a full evaluation.' >&2
+    exit 2
+fi
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 : "${CHECKPOINT:?Set a stable posttraining weight checkpoint}"
@@ -45,21 +50,18 @@ if [[ -n "${WORKERS_PER_GPU:-}" ]]; then
 fi
 source "$ROOT/scripts/robocasa_sim_env.sh"
 if [[ "${DRY_RUN:-0}" != 1 ]]; then
-  "$POLICY_PYTHON" tools/require_robocasa_acceptance.py
+  PYTHONPATH="$ROOT/src:${PYTHONPATH:-}" "$POLICY_PYTHON" -c 'import os, sys; from wam.inference.robocasa_resources import evaluation_resources; evaluation_resources(os.environ["CHECKPOINT"], os.environ["TRAIN_CONFIG"], os.environ["ROBOCASA_SCENE_SEEDS"], output=sys.argv[1] if len(sys.argv) > 1 else None)'
 fi
 
 TASK_NAMES="$(PYTHONPATH="$ROOT/src:${PYTHONPATH:-}" "$POLICY_PYTHON" -c \
   'import sys; from wam.inference.robocasa_resources import load_tasks; print("\n".join(load_tasks(sys.argv[1])))' \
   "$ROBOCASA_TASKS")"
 mapfile -t TASKS <<< "$TASK_NAMES"
-TASK_LIMIT="${ROBOCASA_TASK_LIMIT:-24}"
-[[ "$TASK_LIMIT" =~ ^[1-9][0-9]*$ && "$TASK_LIMIT" -le 24 ]] || { echo 'ROBOCASA_TASK_LIMIT must be 1..24' >&2; exit 2; }
-TASKS=("${TASKS[@]:0:TASK_LIMIT}")
 if [[ "${DRY_RUN:-0}" != 1 ]]; then
   [[ ! -e "$OUTROOT" ]] || { echo "Refusing existing OUTROOT: $OUTROOT" >&2; exit 2; }
   mkdir -p "$OUTROOT"
   cp -- "$ROBOCASA_TASKS" "$OUTROOT/tasks.json"
-  "$POLICY_PYTHON" tools/require_robocasa_acceptance.py --output "$OUTROOT/evaluation_acceptance.json"
+  PYTHONPATH="$ROOT/src:${PYTHONPATH:-}" "$POLICY_PYTHON" -c 'import os, sys; from wam.inference.robocasa_resources import evaluation_resources; evaluation_resources(os.environ["CHECKPOINT"], os.environ["TRAIN_CONFIG"], os.environ["ROBOCASA_SCENE_SEEDS"], output=sys.argv[1] if len(sys.argv) > 1 else None)' "$OUTROOT/evaluation_resources.json"
   exec > >(tee -a "$OUTROOT/launcher.top.log") 2>&1
   if [[ "$SCENE_SEED_MODE" == seed_list ]]; then
     cp -- "$SCENE_SEED_LIST" "$OUTROOT/scene_seed_list.json"
@@ -70,13 +72,6 @@ from wam.robocasa_simulation import load_scene_seed_list
 print(json.dumps(load_scene_seed_list(sys.argv[1], int(sys.argv[2]))), flush=True)
 PY
   fi
-  ENV_NAMES=()
-  for task in "${TASKS[@]}"; do
-    ENV_NAMES+=("gr1_unified/${task}_GR1ArmsAndWaistFourierHands_Env")
-  done
-  CUDA_VISIBLE_DEVICES=0 MUJOCO_EGL_DEVICE_ID=0 "$SIM_PYTHON" tools/check_robocasa_simulator.py \
-    --sim-root "$SIM_ROOT" --env "${ENV_NAMES[@]}" --seed "$SEED"
-  [[ "${PREFLIGHT_ONLY:-0}" != 1 ]] || exit 0
 fi
 echo "checkpoint=$CHECKPOINT tasks=${#TASKS[@]} gpus=$NUM_GPUS_TOTAL episodes/task=$N_EPISODES"
 echo "seed=$SEED policy_seed_mode=fixed_per_replan execute=$EXECUTE_STEPS denoise=$DENOISING_STEPS max_steps=$MAX_EPISODE_STEPS"
@@ -156,7 +151,7 @@ s = sum(row["n_successes"] for row in rows)
 summary = dict(status="FINAL" if not errors else "INCOMPLETE", per_task=rows, errors=errors,
                overall=dict(n_tasks=len(rows), n_episodes=n, expected_episodes=len(sys.argv[3:])*expected,
                             n_successes=s, success_rate=s/n if n else None))
-summary["evaluation_acceptance"] = json.loads((root / "evaluation_acceptance.json").read_text())
+summary["evaluation_resources"] = json.loads((root / "evaluation_resources.json").read_text())
 if seed_list is not None:
     summary["scene_seed_list"] = dict(episode_seeds=seed_list,
         hash_validation=False, backend_seeds_verified=not errors)

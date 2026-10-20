@@ -22,7 +22,7 @@ Multiple candidates require an explicit filename; filenames are not parsed as
 training steps. Training duration, simulator episode limits and optimizer-state
 consistency checks are unchanged.
 
-All examples are relative to the repository root. Use a policy checkpoint with its matching inference configuration, normalization statistics and frozen encoders. No release manifest, checksum or prior acceptance report is required by the direct preparation entry. Training and evaluation do not verify file hashes. Prompt/task hashes used as cache keys are retained.
+All examples are relative to the repository root. Use a policy checkpoint with its matching inference configuration, normalization statistics and frozen encoders.
 
 The source includes configurations for the two released policies:
 
@@ -39,7 +39,7 @@ evaluation does not instantiate those datasets. Resource flags passed to
 checkpoints, supply their own matching configuration and statistics.
 
 Before preparing either benchmark, [download WanVAE, T5 and the tokenizer](../README.md#wanvae-t5-and-tokenizer)
-and run the [offline resource check](RESOURCES.md#offline-resource-check).
+following the [required directory layout](RESOURCES.md#wanvae-t5-and-tokenizer).
 The commands below assume their repository-ID directories are under
 `checkpoints/`. If using another root, replace each `--model-base checkpoints`
 with `--model-base "$DIFFSYNTH_MODEL_BASE_PATH"`; the preparer records the absolute
@@ -51,17 +51,16 @@ root in `eval.env.sh`. The launchers do not download missing models.
 python tools/prepare_eval.py --benchmark libero-plus \
   --checkpoint checkpoints/libero/policy.pt --config configs/inference/phoenix_libero.yaml \
   --stats assets/stats/phoenix_libero.json \
-  --dino checkpoints/dino.pt --stvae checkpoints/stvae.pt \
-  --model-base checkpoints --output resources/libero
-bash scripts/evaluate.sh libero-plus resources/libero/eval.env.sh preflight
-bash scripts/evaluate.sh libero-plus resources/libero/eval.env.sh smoke
+  --dino resources/encoders/dino110k.pt --csvae resources/encoders/csvae.pt \
+  --model-base checkpoints --benchmark-root resources/LIBERO-plus/libero/libero \
+  --output resources/libero
+EVAL_GPUS=0,1,2,3,4,5,6,7 \
+  bash scripts/evaluate.sh libero-plus resources/libero/eval.env.sh full
 ```
 
-Create a different runtime directory for the subsequent full evaluation. The launcher refuses to mix new runs with existing launched outputs. `EVAL_GPUS` selects accelerators; `WORKERS_PER_GPU` defaults to 1. `EVAL_SHARDS` and `EVAL_SHARD_RANK` select disjoint partitions.
+Use a fresh runtime directory for each evaluation run. The launcher refuses to mix new runs with existing launched outputs. `EVAL_GPUS` selects accelerators; `WORKERS_PER_GPU` defaults to 1. `EVAL_SHARDS` and `EVAL_SHARD_RANK` select disjoint partitions.
 
-Full mode uses 10,030 registered tasks; smoke selects one task per suite. Both use one episode per task, the first benchmark-provided initial state, seed 42, 30 settling steps, 10 denoising steps and replan 10 from a 32-action prediction. The cap is 400 steps, or 700 for `libero_10`. BDDL language is authoritative, including language perturbations. Plans, errors and per-task outcomes are recorded.
-
-The public LIBERO-Plus smoke entry audits and builds text caches only for the four selected tasks (the first task in each suite), not the full benchmark. Full evaluation still audits all 10,030 tasks.
+Full evaluation uses 10,030 registered tasks with one episode per task, the first benchmark-provided initial state, seed 42, 30 settling steps, 10 denoising steps and replan 10 from a 32-action prediction. The cap is 400 steps, or 700 for `libero_10`. BDDL language is authoritative, including language perturbations. Plans, errors and per-task outcomes are recorded.
 
 ## RoboCasa GR1
 
@@ -83,17 +82,18 @@ and statistics. Evaluation no longer reads training episode metadata,
 ```bash
 python tools/prepare_eval.py --benchmark robocasa-gr1 \
   --checkpoint checkpoints/robocasa/policy.pt --config configs/inference/phoenix_robocasa.yaml \
-  --dino checkpoints/dino.pt --stvae checkpoints/stvae.pt --model-base checkpoints \
+  --dino resources/encoders/dino110k.pt --csvae resources/encoders/csvae.pt --model-base checkpoints \
   --resources resources/robocasa \
   --sim-python resources/robocasa/environments/robocasa-sim/bin/python \
   --output resources/robocasa-eval
-NUM_GPUS_TOTAL=1 bash scripts/evaluate.sh robocasa-gr1 resources/robocasa-eval/eval.env.sh smoke
+NUM_GPUS_TOTAL=8 N_EPISODES=50 \
+  bash scripts/evaluate.sh robocasa-gr1 resources/robocasa-eval/eval.env.sh full
 ```
 
 The default `--package` is `assets/robocasa` and the default `--scene-seeds` is
 `assets/robocasa/scene_seed_list.json`. The full launcher reads the ordered 24
 tasks from `assets/robocasa/tasks.json`. Each task uses the same saved 50 episode
-seeds (1,200 episodes total); smoke uses the first task/seed. Seeds fix randomized
+seeds (1,200 episodes total). Seeds fix randomized
 initial scenes, not policy noise, and do not guarantee cross-platform pixel
 identity. The task manifest selects simulator environments; actual instructions
 always come from `annotation.human.coarse_action`, not a fixed manifest string.
@@ -111,73 +111,47 @@ not an online API: download matching T5/tokenizer weights before offline runs.
 The first new instruction takes extra time and T5 adds device-memory overhead;
 check the target hardware before choosing workers per GPU.
 
-Prior acceptance reports and file digests are not startup requirements.
 `N_EPISODES=50`, `MAX_EPISODE_STEPS=720`, `EXECUTE_STEPS=12`,
 `DENOISING_STEPS=10` are defaults. Scene seeds are verified against the saved
 manifest during aggregation. The separate policy evaluation seed is 7.
-
-Run target-platform smoke before trusting full results. Structural validation does not certify numerical parity or detect same-size file corruption.
-
-```bash
-# Repeat preparation above with --output resources/robocasa-full first.
-NUM_GPUS_TOTAL=8 N_EPISODES=50 \
-  bash scripts/evaluate.sh robocasa-gr1 resources/robocasa-full/eval.env.sh full
-```
-
-RoboCasa smoke runs the first task (`PnPCupToDrawerClose`) for one episode, with the same 720-step cap, 12-step replan and 10 denoising steps as full evaluation. It checks simulator rendering before loading the policy and writes `merged_summary.json` after the rollout. Use a fresh preparation output directory for each run. A completed smoke validates execution, not benchmark success rate or cross-platform numerical parity.
 
 ## LIBERO-Pro
 
 Use an external [LIBERO-PRO checkout](https://github.com/Zxy-MLlab/LIBERO-PRO) and the official [Pro resources](https://huggingface.co/datasets/zhouxueyang/LIBERO-Pro). Do not install Pro over the Plus package. Each entry selects its own benchmark in a fresh process.
 
-Prepare `resources/libero-pro-benchmark/` with `bddl_files/`, `init_files/` from the official four-case data and `assets/` from LIBERO-PRO (symlinks are supported). The validated data release is `c86fc3b8293185a6f373677018ff3e37f8391602`; this documents provenance, not a runtime hash check. Keep the checkout and assets under ignored resource directories.
+Prepare `resources/libero-pro-benchmark/` with `bddl_files/`, `init_files/` from the official four-case data and `assets/` from LIBERO-PRO (symlinks are supported). The four-case data revision is `c86fc3b8293185a6f373677018ff3e37f8391602`; use matching simulator assets. Keep the checkout and assets under ignored resource directories.
+
+Prepare a runtime directory and launch all 8,000 episodes on eight GPUs:
 
 ```bash
 python tools/prepare_eval.py --benchmark libero-pro \
   --checkpoint checkpoints/libero/policy.pt --config configs/inference/phoenix_libero.yaml \
   --stats assets/stats/phoenix_libero.json \
-  --dino checkpoints/dino.pt --stvae checkpoints/stvae.pt --model-base checkpoints \
-  --libero-repo-root resources/LIBERO-PRO \
-  --benchmark-root resources/libero-pro-benchmark --output resources/libero-pro-run
-EVAL_GPUS=0,1,2,3,4,5,6,7 \
-  bash scripts/evaluate.sh libero-pro resources/libero-pro-run/eval.env.sh smoke
-```
-
-Smoke runs the first task and trial in each of 16 settings (four suites × Object/Position/Semantic/Task), with full episode limits.
-
-For full evaluation, prepare a separate runtime directory and launch all 8,000 episodes on eight GPUs:
-
-```bash
-python tools/prepare_eval.py --benchmark libero-pro \
-  --checkpoint checkpoints/libero/policy.pt --config configs/inference/phoenix_libero.yaml \
-  --stats assets/stats/phoenix_libero.json \
-  --dino checkpoints/dino.pt --stvae checkpoints/stvae.pt --model-base checkpoints \
+  --dino resources/encoders/dino110k.pt --csvae resources/encoders/csvae.pt --model-base checkpoints \
   --libero-repo-root resources/LIBERO-PRO \
   --benchmark-root resources/libero-pro-benchmark --output resources/libero-pro-full
 EVAL_GPUS=0,1,2,3,4,5,6,7 WORKERS_PER_GPU=1 EVAL_SHARDS=1 EVAL_SHARD_RANK=0 \
   bash scripts/evaluate.sh libero-pro resources/libero-pro-full/eval.env.sh full
 ```
 
-Full mode runs 160 tasks × 50 official initial states = 8,000 episodes. The Environment category is not included in this four-case panel. Do not reuse the smoke output directory. If `resources/libero-pro-full` already exists, choose a fresh path and update both `--output` and the `eval.env.sh` argument. Full results are saved under `resources/libero-pro-full/evaluation/`.
+Full mode runs 160 tasks × 50 official initial states = 8,000 episodes. The Environment category is not included in this four-case panel. If `resources/libero-pro-full` already exists, choose a fresh path and update both `--output` and the `eval.env.sh` argument. Full results are saved under `resources/libero-pro-full/evaluation/`.
 
-The result index is `official_task_id * 50 + trial`; every trial uses its own official initial state. Instructions come from BDDL `:language`, not filenames. Seed 42, 30 settling steps, chunk 32, replan 10, 10 denoising steps, and 400/700-step limits match the reference protocol. Actions are decoded against the current observation at each simulator step. No videos are saved. `summary_gam.json` only reports `avg_16_settings` when the complete 8,000-episode panel has no technical errors. Smoke completion certifies execution, not a benchmark success rate.
+The result index is `official_task_id * 50 + trial`; every trial uses its own official initial state. Instructions come from BDDL `:language`, not filenames. Seed 42, 30 settling steps, chunk 32, replan 10, 10 denoising steps, and 400/700-step limits match the reference protocol. Actions are decoded against the current observation at each simulator step. No videos are saved. `summary_gam.json` only reports `avg_16_settings` when the complete 8,000-episode panel has no technical errors.
 
 `--libero-repo-root` selects external Pro code; `--benchmark-root` selects the directory containing `assets/`, `bddl_files/` and `init_files/`. Neither changes the bundled Plus package. The example uses the released LIBERO policy's source inference configuration. See [resource acquisition](RESOURCES.md#libero-pro-benchmark) and [installation](INSTALLATION.md#libero-pro).
 
-Pass `preflight` for resource/contract checks without rollouts. `EVAL_GPUS` selects GPUs and `WORKERS_PER_GPU` defaults to 1. Full runs support `EVAL_SHARDS` and `EVAL_SHARD_RANK`; a shard summary is not a full-panel result. No checkpoint file hashes or historical transfer receipts are required.
+`EVAL_GPUS` selects GPUs and `WORKERS_PER_GPU` defaults to 1. Full runs support `EVAL_SHARDS` and `EVAL_SHARD_RANK`; a shard summary is not a full-panel result.
 
 ### Output files
 
 Outputs are saved in the prepared resource directory's `evaluation/`:
 
-- `preflight.json`: checkpoint/configuration contract checks.
-- `instruction_audit.json` and `plan.json`: tasks, instructions and trial indices.
-- `worker_*/strict_load.json`, `first_action.json`, `egl_context.json`: model loading, finite `(32, 7)` predictions and rendering evidence.
+- `plan.json`: tasks, instructions and trial indices.
 - `results/<suite>/task_<index>.json`: episode outcome and any technical error.
 - `COMPLETE.json`: `passed=true` only after all selected episodes and workers complete without technical errors.
-- `summary_gam.json`: full-panel average stays `null` for smoke or incomplete results.
+- `summary_gam.json`: full-panel average stays `null` for incomplete results.
 
-Keep outputs under ignored `resources/` or `validation_runs/`. Prepare a fresh output directory for each independent run; a launched directory cannot be reused.
+Keep outputs under ignored `resources/` or `runs/`. Prepare a fresh output directory for each independent run; a launched directory cannot be reused.
 
 ## Checkpoint preparation
 
@@ -186,7 +160,7 @@ RoboTwin uses the dedicated resource configuration below rather than
 
 Retain each checkpoint's matching inference config, numerical normalization statistics and encoder weights. The direct preparer accepts either the source inference configs above or an existing saved training config, reads checkpoint progress, and writes a relocated runtime configuration without launching inference. Its output may still be named `train_config.yaml` for compatibility with the LIBERO loader; this does not require distributing the original training recipe. It accepts relative resource paths. RoboCasa inference does not read training dataset metadata or require `ROBOCASA_PATH_MAP`; those remain training-only resources. Public source statistics have sanitized path metadata; use the numerical statistics belonging to the selected checkpoint.
 
-`tools/prepare_release_eval.py` remains available for existing packaged releases, without file hash verification. Export/packaging utilities are separate from runtime.
+`tools/prepare_release_eval.py` prepares evaluation resources from existing packaged releases.
 
 ## RoboTwin C2C and C2R
 
@@ -199,10 +173,6 @@ initialization checkpoints and original Wan DiT shards are not inference inputs.
 
 ```bash
 source configs/machines/robotwin.example.sh
-# Optional: inspect downloaded source/config identity without starting a simulator.
-python tools/check_robotwin_resources.py --root "$ROBOTWIN_ROOT"
-# One complete episode in each mode, with the original task horizon.
-bash scripts/run_robotwin_smoke.sh eval --gpus 0
 # Independent full runs, each with a fresh automatically generated run ID.
 bash scripts/eval_robotwin.sh --mode c2c --gpus 0,1,2,3,4,5,6,7
 bash scripts/eval_robotwin.sh --mode c2r --gpus 0,1,2,3,4,5,6,7
@@ -218,8 +188,8 @@ One policy server runs per selected GPU; tasks are distributed round-robin.
 Scene numeric values and joints must match within 1e-6; RGB error is diagnostic
 because driver/hardware changes can affect pixels. Technical errors are not
 counted as policy failures. Rendering uses SAPIEN/Vulkan, not MuJoCo EGL.
-Outputs default to ignored `validation_runs/`; existing output directories are
-refused. `--run-id` can specify a new name. See [environment setup](INSTALLATION.md#robotwin-environment).
+Outputs default to ignored `runs/evaluation/robotwin/`; existing output directories
+are refused. `--run-id` can specify a new name. See [environment setup](INSTALLATION.md#robotwin-environment).
 `--inference-config` / `ROBOTWIN_INFERENCE_CONFIG` and `--dataset-stats` /
 `ROBOTWIN_EVAL_STATS` allow explicit overrides. Old `ROBOTWIN_TRAIN_CONFIG` and
 the shared server's `--training-config` remain compatibility aliases, not release

@@ -95,11 +95,11 @@ def load_inference_config(path):
     cfg = OmegaConf.load(resource_path(path))
     # Only relocate frozen resources; never override architecture or noise schedules.
     codec = cfg.model.joint_visual_codec
-    codec.stvae_checkpoint_path = str(resource_path(
-        os.environ.get('STVAE_CHECKPOINT') or codec.stvae_checkpoint_path))
+    codec.csvae_checkpoint_path = str(resource_path(
+        os.environ.get('CSVAE_CHECKPOINT') or codec.csvae_checkpoint_path))
     codec.dino_kwargs.checkpoint_path = str(resource_path(
         os.environ.get('DINO_ENCODER_CHECKPOINT') or codec.dino_kwargs.checkpoint_path))
-    from wam.model.modules.codecs.dino_stvae.provenance import bundled_config
+    from wam.model.modules.codecs.dino_csvae.provenance import bundled_config
     cfg.model.joint_visual_codec = bundled_config(OmegaConf.to_container(codec, resolve=True))
     registry = str(resource_path(os.environ.get('EMBODIMENT_REGISTRY')
         or ROOT / 'configs/embodiment_registry/local_robot37_arm18_capacity28_v1.json'))

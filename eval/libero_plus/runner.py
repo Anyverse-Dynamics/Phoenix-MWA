@@ -12,7 +12,6 @@ import time
 import traceback
 
 RUNNER_MODULE = 'eval.libero_plus.runner'
-SMOKE_SUITES = ('libero_goal', 'libero_object', 'libero_spatial', 'libero_10')
 
 def evaluation_checkpoint_path(resource_dir, step=None, filename=None):
     """Allow a release filename while keeping the checkpoint inside its bundle."""
@@ -123,7 +122,7 @@ def read_instruction(task):
     return (text, path)
 
 def plan_path():
-    return Path(os.environ['EVAL_OUTPUT']) / 'audited_balanced10_plan.json'
+    return Path(os.environ['EVAL_OUTPUT']) / 'benchmark_plan.json'
 
 def initial_states(suite, task_id):
     """Keep weights_only=True; allow only NumPy array serialization primitives."""
@@ -133,50 +132,29 @@ def initial_states(suite, task_id):
     with torch.serialization.safe_globals(allowed):
         return suite.get_task_init_states(task_id)
 
-def audit(output):
-    from wam.datasets.lerobot.robot_video_dataset import DEFAULT_PROMPT
-    source = json.loads((ROOT / 'assets/libero_plus_balanced10_manifest.json').read_text())
-    assert source['total_selected'] == len(source['tasks']) == 1003
-    assert len({(i['suite'], i['task_id']) for i in source['tasks']}) == 1003
-    suites = benchmark()
-    rows, changed = ([], 0)
-    for item in source['tasks']:
-        task = suites[item['suite']].get_task(item['task_id'])
-        if task.name != item['task_name']:
-            raise ValueError(f'Manifest/registry identity mismatch: {item} -> {task.name}')
-        instruction, bddl = read_instruction(task)
-        states = initial_states(suites[item['suite']], item['task_id'])
-        assert len(states) > 0
-        changed += instruction != task.language
-        rows.append({**item, 'instruction': instruction, 'registry_language': task.language, 'prompt': DEFAULT_PROMPT.format(task=instruction), 'bddl_file': str(bddl)})
-    dump(plan_path(), rows)
-    dump(output / 'instruction_audit.json', {'passed': True, 'total': len(rows), 'source': 'actual BDDL :language', 'not_raw_filename': True, 'registry_language_differences': changed, 'language_perturbations_preserved': True, 'categories': dict(Counter((i['category'] for i in rows))), 'suites': dict(Counter((i['suite'] for i in rows))), 'manifest_sha256': sha(ROOT / 'assets/libero_plus_balanced10_manifest.json'), 'examples': rows[:7]})
-    print(f'INSTRUCTION_AUDIT_OK tasks={len(rows)} registry_differences={changed}', flush=True)
-    return rows
-
-def audit_full(output, *, smoke=False):
+def build_full_plan(output):
     """Full task classification from the same pinned, locally patched Plus benchmark."""
     from wam.datasets.lerobot.robot_video_dataset import DEFAULT_PROMPT
     source = json.loads((PLUS / 'libero/libero/benchmark/task_classification.json').read_text())
     rows = []
     for suite, tasks in benchmark().items():
         assert len(source[suite]) == tasks.n_tasks
-        for item in (source[suite][:1] if smoke else source[suite]):
+        for item in source[suite]:
             index = item['id'] - 1
             task = tasks.get_task(index)
             assert task.name == item['name']
             instruction, bddl = read_instruction(task)
             assert len(initial_states(tasks, index)) > 0
             rows.append({'suite': suite, 'task_id': index, 'task_name': task.name, 'category': item['category'], 'difficulty_level': item['difficulty_level'], 'instruction': instruction, 'prompt': DEFAULT_PROMPT.format(task=instruction), 'bddl_file': str(bddl)})
-    assert len(rows) == len({(r['suite'], r['task_id']) for r in rows}) == (4 if smoke else 10030)
+    assert len(rows) == len({(r['suite'], r['task_id']) for r in rows}) == 10030
     dump(plan_path(), rows)
     dump(output / 'instruction_audit.json', {'passed': True, 'total': len(rows), 'classification_sha256': sha(PLUS / 'libero/libero/benchmark/task_classification.json'), 'suites': dict(Counter((r['suite'] for r in rows))), 'categories': dict(Counter((r['category'] for r in rows)))})
     return rows
 
-def preflight(output, *, smoke=False):
+def prepare_evaluation(output):
     import torch
     from wam.training.checkpoint import _joint96_identity
-    from wam.model.modules.codecs.dino_stvae.provenance import verify_bundle, canonical_source_identity, BUNDLED_SOURCE
+    from wam.model.modules.codecs.dino_csvae.provenance import verify_bundle, canonical_source_identity, BUNDLED_SOURCE
     from wam.model.modules.conditioning.frame_attention import JOINT96_ACTION_VIDEO_ATTENTION
     cfg = train_cfg()
     read_checkpoint_progress()
@@ -190,7 +168,7 @@ def preflight(output, *, smoke=False):
     for split in ('train', 'val'):
         assert cfg.data[split].processor.action_state_transforms[0]._target_.endswith('LiberoRight80FLUBIdentityTransform')
     stats_document = json.loads((INCOMING / 'dataset_stats.json').read_text())
-    print('PREFLIGHT_RESOURCES_OK hash_validation=disabled', flush=True)
+    print('EVALUATION_RESOURCES_OK hash_validation=disabled', flush=True)
     p = torch.load(EVAL_CKPT, mmap=True, weights_only=True, map_location='cpu')
     from wam.posttrain.eval_contract import validate_evaluation_contract
     validate_evaluation_contract(cfg, p, INCOMING / 'dataset_stats.json', expected_pretrain_step=PRETRAIN_STEP)
@@ -210,16 +188,9 @@ def preflight(output, *, smoke=False):
     assert not cfg.model.memory.enabled and (not cfg.model.future_delta.enabled)
     stats = json.loads((INCOMING / 'dataset_stats.json').read_text())['action']['default']
     assert stats['global_min'][-1] == 0.0 and stats['global_max'][-1] == 1.0
-    import numpy as np
-    probe = np.zeros((32, 7), dtype=np.float32)
-    probe[:3, -1] = [0.0, 1.0, 0.5]
-    from wam.datasets.lerobot.transforms.libero_flu_bi import LiberoRight80FLUBIdentityTransform
-    converted = LiberoRight80FLUBIdentityTransform().decode_simulator_commands(torch.from_numpy(probe), torch.zeros(32, 6)).numpy()
-    assert np.array_equal(converted[:3, -1], [1.0, -1.0, 0.0])
-    assert np.array_equal(converted[:, :6], probe[:, :6])
-    dump(output / 'preflight.json', {'passed': True, 'checkpoint': str(EVAL_CKPT), 'step': p['step'], 'pretrain_step': PRETRAIN_STEP, 'checkpoint_sha256': expected_sha, 'identity': identity, 'action_video_attention': JOINT96_ACTION_VIDEO_ATTENTION, 'text_template': "A video recorded from a robot's point of view executing the following instruction: {task}", 'text_mask': 'zero padded embeddings; all 128 positions valid', 'camera_slots': [0, 2], 'camera_is_pad': [False, True, False], 'action_valid_dims': [*range(47, 53), 56], 'proprio_valid_dims': list(range(40, 57)), 'video_shift': 6, 'action_shift': 1, 'chunk': 32, 'replan': 10, 'denoise': 10, 'environment': f"MuJoCo {mujoco.__version__} / {os.environ['MUJOCO_GL']}", 'video_write': False, 'gripper': 'native 0=close/1=open -> env 1-2*clip(g,0,1); continuous', 'action_frame': LIBERO_FLU_BI_CONTRACT, 'execution': 'canonical queue -> each-step current source EE -> inverse FLU/B=I -> clipped OSC command'})
-    print('JOINT96_PREFLIGHT_OK', flush=True)
-    return audit_full(output, smoke=smoke) if os.environ.get('EVAL_SELECTION') == 'full' else audit(output)
+    dump(output / 'runtime_contract.json', {'passed': True, 'checkpoint': str(EVAL_CKPT), 'step': p['step'], 'pretrain_step': PRETRAIN_STEP, 'checkpoint_sha256': expected_sha, 'identity': identity, 'action_video_attention': JOINT96_ACTION_VIDEO_ATTENTION, 'text_template': "A video recorded from a robot's point of view executing the following instruction: {task}", 'text_mask': 'zero padded embeddings; all 128 positions valid', 'camera_slots': [0, 2], 'camera_is_pad': [False, True, False], 'action_valid_dims': [*range(47, 53), 56], 'proprio_valid_dims': list(range(40, 57)), 'video_shift': 6, 'action_shift': 1, 'chunk': 32, 'replan': 10, 'denoise': 10, 'environment': f"MuJoCo {mujoco.__version__} / {os.environ['MUJOCO_GL']}", 'video_write': False, 'gripper': 'native 0=close/1=open -> env 1-2*clip(g,0,1); continuous', 'action_frame': LIBERO_FLU_BI_CONTRACT, 'execution': 'canonical queue -> each-step current source EE -> inverse FLU/B=I -> clipped OSC command'})
+    print('JOINT96_EVALUATION_READY', flush=True)
+    return build_full_plan(output)
 
 def text_cache(output):
     import torch
@@ -273,10 +244,10 @@ class Policy:
         model_cfg.video_dit_config.use_gradient_checkpointing = False
         model_cfg.action_dit_config.use_gradient_checkpointing = False
         model_cfg.action_dit_config.embodiment_registry_path = str(ROOT / 'configs/embodiment_registry/local_robot37_arm18_capacity28_v1.json')
-        from wam.model.modules.codecs.dino_stvae.provenance import bundled_config
+        from wam.model.modules.codecs.dino_csvae.provenance import bundled_config
         model_cfg.joint_visual_codec = bundled_config(OmegaConf.to_container(model_cfg.joint_visual_codec, resolve=True))
         codec = model_cfg.joint_visual_codec
-        codec.stvae_checkpoint_path = os.environ['STVAE_CHECKPOINT']
+        codec.csvae_checkpoint_path = os.environ['CSVAE_CHECKPOINT']
         codec.dino_kwargs.checkpoint_path = os.environ['DINO_ENCODER_CHECKPOINT']
         import wam.model.factory as factory
         original_loader = factory.load_wan22_ti2v_5b_components
@@ -317,36 +288,6 @@ class Policy:
 def egl_probe(output):
     from eval.libero_plus.rendering import probe
     return probe(output)
-
-def render_check(output):
-    import numpy as np
-    from libero.libero.envs import OffScreenRenderEnv
-    from eval.libero_plus.rendering import install_render_fix
-    install_render_fix()
-    report = egl_probe(output)
-    rows = json.loads(plan_path().read_text())
-    suites = benchmark()
-    results = []
-    for suite in ('libero_goal', 'libero_object', 'libero_spatial', 'libero_10'):
-        row = next((r for r in rows if r['suite'] == suite))
-        env = OffScreenRenderEnv(bddl_file_name=row['bddl_file'], camera_heights=256, camera_widths=256, render_gpu_device_id=-1)
-        try:
-            env.seed(42)
-            env.reset()
-            states = initial_states(suites[suite], row['task_id'])
-            env.set_init_state(states[0])
-            obs, _, _, _ = env.step([0, 0, 0, 0, 0, 0, -1])
-            images = {}
-            for key in ('agentview_image', 'robot0_eye_in_hand_image'):
-                image = np.asarray(obs[key])
-                if image.shape != (256, 256, 3) or not np.isfinite(image).all() or image.std() == 0:
-                    raise RuntimeError(f'Invalid {suite} / {key}: {image.shape}')
-                images[key] = {'shape': list(image.shape), 'dtype': str(image.dtype), 'min': int(image.min()), 'max': int(image.max()), 'std': float(image.std()), 'sha256': hashlib.sha256(image.tobytes()).hexdigest()}
-            results.append({'suite': suite, 'task_id': row['task_id'], 'images': images, 'reset_and_step': True})
-            print(f"RENDER_OK {suite} backend={report['backend']} dual_camera=256x256", flush=True)
-        finally:
-            env.close()
-    dump(output / 'render_check.json', {'passed': True, **report, 'tasks': results})
 
 def evaluation_backend():
     backend = os.environ.get('EVAL_ENV_BACKEND', 'inprocess')
@@ -468,10 +409,8 @@ def launch(args):
     rendering = render_backend()
     env_backend = evaluation_backend()
     if env_backend == 'subprocess':
-        print('WARNING: subprocess rendering is diagnostic only; observation parity and policy smoke require target-platform validation. See docs/EVALUATION.md.', flush=True)
+        print('WARNING: subprocess rendering is diagnostic only; observation parity requires target-platform validation. See docs/EVALUATION.md.', flush=True)
     rows = json.loads(plan_path().read_text())
-    if args.phase == 'smoke':
-        rows = [next((r for r in rows if r['suite'] == suite)) for suite in SMOKE_SUITES]
     global_expected = len(rows)
     selection_hash = hashlib.sha256(json.dumps(sorted(((r['suite'], r['task_id']) for r in rows))).encode()).hexdigest()
     if args.shards < 1 or not 0 <= args.shard_rank < args.shards:
@@ -535,7 +474,7 @@ def launch(args):
 
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument('--phase', choices=('audit', 'audit-full', 'preflight', 'text', 'render-check', 'smoke', 'balanced10', 'full', 'worker', 'summary'), required=True)
+    p.add_argument('--phase', choices=('full', 'text', 'worker', 'summary'), required=True)
     p.add_argument('--output', type=Path, required=True)
     p.add_argument('--worker', type=int, default=0)
     p.add_argument('--workers', type=int, default=1)
@@ -544,6 +483,8 @@ def main():
     p.add_argument('--shards', type=int, default=1)
     p.add_argument('--shard-rank', type=int, default=0)
     args = p.parse_args()
+    if os.environ.get('EVAL_SELECTION', 'full') != 'full':
+        raise ValueError('Reduced evaluation panels moved to Phoenix-devtools')
     if sys.flags.optimize:
         raise RuntimeError('Python -O disables checkpoint guards and is not supported')
     from eval.libero_plus.rendering import render_backend
@@ -559,25 +500,17 @@ def main():
         setup_libero_paths()
     if args.phase != 'summary':
         read_checkpoint_progress()
-    if args.phase in ('smoke', 'balanced10', 'full'):
+    if args.phase == 'full':
         if (args.output / 'launch.json').exists():
             raise FileExistsError('Use a new output directory')
-        os.environ.setdefault('EVAL_SELECTION', 'full' if args.phase == 'full' else 'balanced10')
+        os.environ['EVAL_SELECTION'] = 'full'
         gpus = check_gpus(args.gpus)
-        preflight(args.output, smoke=args.phase == 'smoke')
+        prepare_evaluation(args.output)
         env = os.environ.copy()
         env['CUDA_VISIBLE_DEVICES'] = str(gpus[0])
         subprocess.run([sys.executable, '-m', RUNNER_MODULE, '--phase', 'text', '--output', str(args.output)], env=env, check=True)
-    if args.phase == 'audit':
-        audit(args.output)
-    elif args.phase == 'audit-full':
-        audit_full(args.output)
-    elif args.phase == 'preflight':
-        preflight(args.output)
-    elif args.phase == 'text':
+    if args.phase == 'text':
         text_cache(args.output)
-    elif args.phase == 'render-check':
-        render_check(args.output)
     elif args.phase == 'worker':
         worker(args)
     elif args.phase == 'summary':

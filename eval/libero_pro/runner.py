@@ -65,7 +65,7 @@ def plan_path():
     return Path(os.environ['EVAL_OUTPUT']) / 'audited_pro_plan.json'
 
 
-def audit(output, *, smoke=False):
+def build_full_plan(output):
     from wam.datasets.lerobot.robot_video_dataset import DEFAULT_PROMPT
     suites, rows = benchmark(), []
     for suite in BASES:
@@ -73,26 +73,26 @@ def audit(output, *, smoke=False):
             name = f'{suite}_{suffix}'
             if suites[name].suite.n_tasks != 10:
                 raise ValueError(f'Expected 10 official tasks in {name}')
-            for task_id in range(1 if smoke else 10):
+            for task_id in range(10):
                 task = suites[name].get_task(task_id * 50)
                 text, bddl = instruction(task)
-                for trial in range(1 if smoke else 50):
+                for trial in range(50):
                     index = task_id * 50 + trial
                     suites[name].get_task_init_states(index)
                     rows.append(dict(suite=name, task_id=index, official_task_id=task_id,
                         trial=trial, task_name=task.name, category=category, base_suite=suite,
                         instruction=text, prompt=DEFAULT_PROMPT.format(task=text), bddl_file=str(bddl)))
-    expected = 16 if smoke else 8000
+    expected = 8000
     if len(rows) != expected or len({(r['suite'], r['task_id']) for r in rows}) != expected:
         raise ValueError('Invalid Pro panel identity/count')
     base.dump(plan_path(), rows)
     base.dump(output / 'instruction_audit.json', dict(passed=True, panel='LIBERO-Pro four-case',
-        phase='smoke' if smoke else 'full', total_episodes=len(rows),
-        official_tasks=16 if smoke else 160, trials_per_task=1 if smoke else 50,
+        phase='full', total_episodes=len(rows),
+        official_tasks=160, trials_per_task=50,
         categories=dict(Counter(r['category'] for r in rows)),
         instruction_source='BDDL :language', initialization='official task state[trial]',
         excluded_category='Environment', seed=42, settle_steps=30))
-    print(f'PRO_PANEL_AUDIT_OK episodes={len(rows)} smoke={smoke}', flush=True)
+    print(f'PRO_PANEL_AUDIT_OK episodes={len(rows)}', flush=True)
     return rows
 
 
@@ -119,9 +119,8 @@ def main():
     if os.environ.get('EVAL_ENV_BACKEND', 'inprocess') != 'inprocess':
         raise ValueError('LIBERO-Pro currently requires inprocess rendering')
     base.RUNNER_MODULE = 'eval.libero_pro.runner'
-    base.SMOKE_SUITES = SETTINGS
     base.benchmark, base.read_instruction = benchmark, instruction
-    base.plan_path, base.audit_full, base.audit = plan_path, audit, audit
+    base.plan_path, base.build_full_plan = plan_path, build_full_plan
     base.summarize = summarize
     base.main()
 

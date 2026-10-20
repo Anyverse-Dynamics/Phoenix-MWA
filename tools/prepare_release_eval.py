@@ -46,12 +46,6 @@ class Release:
 def write_json(path, value):
     Path(path).write_text(json.dumps(value, indent=2, ensure_ascii=False) + '\n')
 
-def relocate_acceptance(report, model, checkpoint, source_sha256):
-    """Bind a derived report to the same exported policy without changing checks."""
-    result = dict(report)
-    result.update(checkpoint=str(checkpoint), source_checkpoint=report['checkpoint'], source_report_sha256=source_sha256, release_policy_sha256=model.get('sha256'), relocation_scope='evaluation_paths_only; numerical checks unchanged')
-    return result
-
 def relocate_metadata(release, model_directory, package, output):
     """Restore source ns mtimes only after checking each copied metadata payload."""
     mappings = {}
@@ -85,7 +79,7 @@ def prepare(args):
         if relative.startswith(model_directory + '/'):
             release.file(relative)
     encoders = {}
-    for name in ('dino', 'stvae'):
+    for name in ('dino', 'csvae'):
         record = release.manifest['encoders'][name]
         encoders[name] = release.file(record['path'])
     cfg = OmegaConf.load(release.file(model['config']))
@@ -104,7 +98,6 @@ def prepare(args):
         if not args.robocasa_resources:
             raise ValueError('--robocasa-resources is required for RoboCasa simulator forks/assets')
         resources = Path(args.robocasa_resources).resolve(strict=True)
-        acceptance = {"passed": None, "hash_validation": False}
         from wam.inference.robocasa_resources import DEFAULT_PACKAGE, DEFAULT_SEEDS, load_inference_package
         package_root = DEFAULT_PACKAGE
         load_inference_package(package_root)
@@ -116,11 +109,11 @@ def prepare(args):
         from wam.inference.robocasa_normalization import resolve_normalization_stats
         stats = resolve_normalization_stats(cfg, override=getattr(args, 'stats', None))
     output.mkdir(parents=True)
-    from wam.model.modules.codecs.dino_stvae.provenance import verify_bundle
+    from wam.model.modules.codecs.dino_csvae.provenance import verify_bundle
     bundled_source_sha256 = verify_bundle()['source_sha256']
     registry = ROOT / 'configs/embodiment_registry' / ('local_robot37_arm18_capacity28_v1.json' if args.model == 'libero' else 'robocasa_gr1_delta80_slot18_v1.json')
-    updates = {'init_checkpoint': None, 'resume': None, 'local_robot_softprompt.init_checkpoint': None, 'local_robot_softprompt.registry_path': str(registry), 'model.action_dit_config.embodiment_registry_path': str(registry), 'model.joint_visual_codec.source_root': 'bundled://dino-stvae-v1', 'model.joint_visual_codec.source_sha256': bundled_source_sha256, 'model.joint_visual_codec.stvae_checkpoint_path': str(encoders['stvae']), 'model.joint_visual_codec.dino_kwargs.checkpoint_path': str(encoders['dino']), 'model.joint_visual_codec.dino_kwargs.starvla_source_path': 'bundled://dino-stvae-v1/third_party/dino_runtime', 'model.joint_visual_codec.dino_kwargs.dinov3_source_path': 'bundled://dino-stvae-v1/third_party/dino_runtime/dinov3'}
-    env = {'DINO_ENCODER_CHECKPOINT': str(encoders['dino']), 'STVAE_CHECKPOINT': str(encoders['stvae']), 'DIFFSYNTH_MODEL_BASE_PATH': str(model_base)}
+    updates = {'init_checkpoint': None, 'resume': None, 'local_robot_softprompt.init_checkpoint': None, 'local_robot_softprompt.registry_path': str(registry), 'model.action_dit_config.embodiment_registry_path': str(registry), 'model.joint_visual_codec.source_root': 'bundled://dino-csvae-v2', 'model.joint_visual_codec.source_sha256': bundled_source_sha256, 'model.joint_visual_codec.csvae_checkpoint_path': str(encoders['csvae']), 'model.joint_visual_codec.dino_kwargs.checkpoint_path': str(encoders['dino']), 'model.joint_visual_codec.dino_kwargs.starvla_source_path': 'bundled://dino-csvae-v2/third_party/dino_runtime', 'model.joint_visual_codec.dino_kwargs.dinov3_source_path': 'bundled://dino-csvae-v2/third_party/dino_runtime/dinov3'}
+    env = {'DINO_ENCODER_CHECKPOINT': str(encoders['dino']), 'CSVAE_CHECKPOINT': str(encoders['csvae']), 'DIFFSYNTH_MODEL_BASE_PATH': str(model_base)}
     if args.model == 'libero':
         for name in ('dataset_stats.json', 'initialization.json'):
             shutil.copyfile(release.file(f'{model_directory}/{name}'), output / name)
@@ -128,13 +121,12 @@ def prepare(args):
         config_path = output / 'train_config.yaml'
         env.update(PYTHON=args.policy_python, JOINT96_EVAL_RESOURCE_DIR=str(output), JOINT96_EVAL_CHECKPOINT_FILENAME='policy.pt', LIBERO_BENCHMARK_ROOT=str(benchmark), LIBERO_CONFIG_PATH=str(output / 'libero_paths'), EVAL_TEXT_CACHE=str(output / 'text_cache'), EVAL_OUTPUT=str(output / 'evaluation'), EVAL_ENV_BACKEND='inprocess', EVAL_RENDER_BACKEND=args.render_backend)
     else:
-        write_json(output / 'acceptance.json', acceptance)
         updates['inference.normalization_stats'] = str(stats)
         updates['inference.text_cache_dir'] = str(output/'text_cache')
         for split in ('train', 'val'):
             updates.update({f'data.{split}.package_root': str(package_root), f'data.{split}.cache_root': str(output / 'unused_training_cache'), f'data.{split}.pretrained_norm_stats': str(stats)})
         config_path = output / 'config.yaml'
-        env.update(POLICY_PYTHON=args.policy_python, CHECKPOINT=str(checkpoint), TRAIN_CONFIG=str(config_path), ROBOCASA_PACKAGE=str(package_root), ROBOCASA_REGISTRY=str(registry), ROBOCASA_RESOURCES=str(resources), ROBOCASA_ACCEPTANCE_REPORT=str(output / 'acceptance.json'), ROBOCASA_SCENE_SEEDS=str(seeds), EVAL_ROOT=str(output / 'evaluation'), OUTROOT=str(output / 'evaluation'), ROBOCASA_EVAL_ALLOW_PARITY_MISMATCH='0', ROBOCASA_PARITY_WAIVER_REASON=args.parity_waiver_reason or '', MUJOCO_GL=args.render_backend, PYOPENGL_PLATFORM=args.render_backend)
+        env.update(POLICY_PYTHON=args.policy_python, CHECKPOINT=str(checkpoint), TRAIN_CONFIG=str(config_path), ROBOCASA_PACKAGE=str(package_root), ROBOCASA_REGISTRY=str(registry), ROBOCASA_RESOURCES=str(resources), ROBOCASA_SCENE_SEEDS=str(seeds), EVAL_ROOT=str(output / 'evaluation'), OUTROOT=str(output / 'evaluation'), MUJOCO_GL=args.render_backend, PYOPENGL_PLATFORM=args.render_backend)
         if args.sim_python:
             env['SIM_PYTHON'] = str(interpreter_path(args.sim_python))
     for key, value in updates.items():
@@ -143,8 +135,6 @@ def prepare(args):
     env_path = output / 'eval.env.sh'
     env_path.write_text('# Generated evaluation paths; source this file before the documented launcher.\n' + ''.join((f'export {key}={shlex.quote(str(value))}\n' for key, value in env.items())))
     receipt = {'schema': 'phoenix.eval_runtime.v1', 'model': args.model, 'release_manifest_sha256': sha256(release.manifest_path), 'verified_files': release.verified, 'checkpoint': str(checkpoint), 'config': str(config_path), 'env': str(env_path), 'private_initialization_required': False, 'evaluation_launched': False, 'configuration_path_updates': updates}
-    if args.model == 'robocasa':
-        receipt.update(numerical_parity_passed=acceptance.get('passed') is True, training_acceptance_changed=False)
     write_json(output / 'prepare.json', receipt)
     return receipt
 
@@ -160,7 +150,6 @@ def main():
     parser.add_argument('--stats', type=Path, help='Override RoboCasa inference normalization statistics')
     parser.add_argument('--sim-python', type=Path)
     parser.add_argument('--render-backend', choices=('egl', 'osmesa'), default='egl')
-    parser.add_argument('--parity-waiver-reason', help='Explicit evaluation-only authorization for a failed parity report')
     print(json.dumps(prepare(parser.parse_args()), indent=2))
 if __name__ == '__main__':
     main()

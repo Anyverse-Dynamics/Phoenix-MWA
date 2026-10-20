@@ -71,7 +71,7 @@ def main():
     if not tasks or not all(gpus): raise ValueError('Empty task/GPU selection')
     run_id = a.run_id or f'robotwin_{a.mode}_{datetime.now():%Y%m%d_%H%M%S}'
     if Path(run_id).name != run_id: raise ValueError('run-id must be a simple name')
-    output = Path(os.environ.get('ROBOTWIN_OUTPUT_ROOT', ROOT/'validation_runs'))/run_id
+    output = Path(os.environ.get('ROBOTWIN_OUTPUT_ROOT', ROOT/'runs/evaluation/robotwin'))/run_id
     output.mkdir(parents=True, exist_ok=False)
     (output/'RUN.json').write_text(json.dumps(dict(mode=a.mode, tasks=tasks,
         episodes=a.episodes, frozen_input=str(fixtures), checkpoint=checkpoint,

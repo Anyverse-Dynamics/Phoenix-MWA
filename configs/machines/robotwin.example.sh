@@ -6,8 +6,8 @@ export WAM_PRETRAIN_CHECKPOINT="${WAM_PRETRAIN_CHECKPOINT:-$PWD/checkpoints/pret
 export ROBOTWIN_DATA_ROOT="${ROBOTWIN_DATA_ROOT:-$PWD/data/robotwin}"
 export ROBOTWIN_TEXT_CACHE="${ROBOTWIN_TEXT_CACHE:-$PWD/data/cache/robotwin-text}"
 # Inference resources. Keep caller overrides, including legacy deployment envs.
-export DINO_ENCODER_CHECKPOINT="${DINO_ENCODER_CHECKPOINT:-$PWD/checkpoints/encoders/dino110k.pt}"
-export STVAE_CHECKPOINT="${STVAE_CHECKPOINT:-$PWD/checkpoints/encoders/stvae150k.pt}"
+export DINO_ENCODER_CHECKPOINT="${DINO_ENCODER_CHECKPOINT:-$PWD/resources/encoders/dino110k.pt}"
+export CSVAE_CHECKPOINT="${CSVAE_CHECKPOINT:-$PWD/resources/encoders/csvae.pt}"
 export DIFFSYNTH_MODEL_BASE_PATH="${DIFFSYNTH_MODEL_BASE_PATH:-$PWD/checkpoints}"
 export ROBOTWIN_ROOT="${ROBOTWIN_ROOT:-$PWD/resources/robotwin/RoboTwin}"
 export ROBOTWIN_FROZEN_C2C="${ROBOTWIN_FROZEN_C2C:-$PWD/resources/robotwin/frozen/c2c}"

@@ -154,9 +154,9 @@ def joint96_checkpoint_metadata(model):
         return None
     paths = copy.deepcopy(getattr(model, 'model_paths', {}))
     encoder = paths.get('joint_visual_encoder', {})
-    if not encoder.get('stvae'):
+    if not encoder.get('csvae'):
         raise ValueError('Joint96 checkpoint requires frozen encoder source and checkpoint metadata')
-    metadata = {'schema': 'phoenix.local_joint96.weights.v1', 'model_paths': paths, 'channel_order': ['wan_vae48', 'stvae48'], 'camera_order': ['main', 'left', 'right'], 'action_dim': 80, 'proprio_dim': 80, 'action_video_attention': JOINT96_ACTION_VIDEO_ATTENTION}
+    metadata = {'schema': 'phoenix.local_joint96.weights.v1', 'model_paths': paths, 'channel_order': ['wan_vae48', 'csvae48'], 'camera_order': ['main', 'left', 'right'], 'action_dim': 80, 'proprio_dim': 80, 'action_video_attention': JOINT96_ACTION_VIDEO_ATTENTION}
     prompt = getattr(getattr(model, 'action_expert', None), 'embodiment_prompt', None)
     if prompt is not None:
         metadata['soft_prompt'] = prompt.metadata()
@@ -173,19 +173,22 @@ def _joint96_identity(metadata):
     if not isinstance(attention, str) or not attention:
         raise ValueError('Joint96 checkpoint identity missing a valid action_video_attention; legacy attention semantics must be verified before migration')
     encoder = metadata['model_paths']['joint_visual_encoder']
-    stvae = encoder['stvae']
+    csvae = encoder.get('csvae')
+    if (not isinstance(csvae, dict) or csvae.get('model_type') != 'causal_semantic_vae'
+            or type(csvae.get('format_version')) is not int or csvae['format_version'] != 2):
+        raise ValueError('Joint96 checkpoint requires CSVAE format version 2')
     identity = {key: metadata[key] for key in ('channel_order', 'camera_order', 'action_dim', 'proprio_dim', 'action_video_attention')}
     for key in ('source_sha256', 'posterior', 'per_camera_input_hw', 'temporal_compression', 'extra_latent_scaling'):
         identity[key] = encoder.get(key)
-    if encoder.get('source_root') == 'bundled://dino-stvae-v1':
-        from wam.model.modules.codecs.dino_stvae.provenance import canonical_source_identity
+    if encoder.get('source_root') == 'bundled://dino-csvae-v2':
+        from wam.model.modules.codecs.dino_csvae.provenance import canonical_source_identity
         identity['source_sha256'] = canonical_source_identity(encoder)
     if 'current_conditioning' in encoder:
         if encoder['current_conditioning'] != 'independent_single_frame_v1':
             raise ValueError('Unknown Joint96 current_conditioning')
         identity['current_conditioning'] = encoder['current_conditioning']
-    for key in ('stvae_checkpoint_sha256', 'teacher_sha256', 'stvae_step', 'teacher_checkpoint_state', 'teacher_output_source', 'teacher_preprocessing', 'dinov3_source_commit'):
-        identity[key] = stvae.get(key)
+    for key in ('csvae_checkpoint_sha256', 'teacher_sha256', 'csvae_step', 'teacher_checkpoint_state', 'teacher_output_source', 'teacher_preprocessing', 'dinov3_source_commit'):
+        identity[key] = csvae.get(key)
     if 'soft_prompt' in metadata:
         from wam.embodiment_registry import EmbodimentRegistry
         prompt = metadata['soft_prompt']
@@ -283,7 +286,8 @@ def save_wam_checkpoint(model, path, step=None):
         payload['track_bridge'] = model.track_bridge.state_dict()
     metadata = joint96_checkpoint_metadata(model)
     if metadata is not None:
-        payload['joint96_metadata'] = metadata
+        from wam.utils.checkpoint_metadata import sanitize_checkpoint_metadata
+        payload['joint96_metadata'] = sanitize_checkpoint_metadata(metadata)
     torch.save(payload, path)
 
 def format_skipped_state_preview(skipped: list[tuple[str, tuple[int, ...], tuple[int, ...]]]) -> str:

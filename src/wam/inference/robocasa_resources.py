@@ -16,7 +16,7 @@ TEXT_CONTRACT = {
 }
 
 
-def load_inference_package(root=DEFAULT_PACKAGE, *, allow_smoke=False):
+def load_inference_package(root=DEFAULT_PACKAGE):
     """Validate deployment semantics, never open training metadata or embeddings.
 
     Old training manifests remain readable for compatibility. Their episode
@@ -30,8 +30,8 @@ def load_inference_package(root=DEFAULT_PACKAGE, *, allow_smoke=False):
         if package.get('purpose') != 'inference' or package.get('text') != TEXT_CONTRACT:
             raise ValueError('Invalid RoboCasa inference/text contract')
     elif schema in ('wam.robocasa.posttrain.v1', 'wam.robocasa.posttrain.v2'):
-        if package.get('purpose') != 'training' and not (allow_smoke and package.get('purpose') == 'smoke'):
-            raise ValueError('Smoke package requires explicit allow_smoke')
+        if package.get('purpose') != 'training':
+            raise ValueError('A training or inference package is required')
         if schema.endswith('.v2') and package.get('prompt_source') != 'episodes.jsonl:remarks':
             raise ValueError('Missing episode prompt provenance')
     else:
@@ -52,3 +52,17 @@ def load_tasks(path=DEFAULT_TASKS):
             or len(set(tasks)) != 24):
         raise ValueError('Expected 24 unique RoboCasa task names')
     return tasks
+
+
+def evaluation_resources(checkpoint, config, scene_seeds, *, output=None):
+    """Resolve required deployment inputs before starting simulator workers."""
+    paths = {name: str(Path(value).resolve(strict=True)) for name, value in (
+        ("checkpoint", checkpoint), ("config", config), ("scene_seeds", scene_seeds))}
+    if any(not Path(value).is_file() for value in paths.values()):
+        raise ValueError("Evaluation inputs must be files")
+    result = {**paths, "hash_validation": False, "inference_validation": "performed_during_rollout"}
+    if output is not None:
+        with Path(output).open("x") as stream:
+            json.dump(result, stream, indent=2)
+            stream.write("\n")
+    return result

@@ -15,7 +15,7 @@ train:
     val_transforms: ${data.train.processor.train_transforms}
   visual_cache:
     vae_root: ${oc.env:LIBERO_WAN_VAE_CACHE}
-    stvae_root: ${oc.env:LIBERO_STVAE_CACHE}
+    csvae_root: ${oc.env:LIBERO_CSVAE_CACHE}
     source_root: ${model.joint_visual_codec.source_root}
     source_sha256: ${model.joint_visual_codec.source_sha256}
     initialization_checkpoint: ${init_checkpoint}
