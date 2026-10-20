@@ -1,0 +1,21 @@
+Phoenix pretraining is developed by the Phoenix team under the MIT license
+in LICENSE. The following adapted third-party components retain their
+original attribution:
+
+- FastWAM visual encoder implementation, adapted for the Phoenix CS-VAE:
+  src/wam/model/modules/codecs/dino_csvae/,
+  with license in LICENSES/FastWAM-encoder-LICENSE.
+- StarVLA and DINOv3 runtime: src/wam/third_party/dino_runtime/,
+  with STARVLA-LICENSE and dinov3/LICENSE.md in that tree.
+
+- Hugging Face LeRobot: src/wam/datasets/lerobot/lerobot/, under the
+  Apache License 2.0. Original copyright headers are retained.
+  https://github.com/huggingface/lerobot
+- PyTorch3D rotation conversions: src/wam/datasets/lerobot/utils/rotation.py,
+  under the BSD license in LICENSES/PyTorch3D.txt.
+  Copyright (c) Meta Platforms, Inc. and affiliates.
+  https://github.com/facebookresearch/pytorch3d
+
+The Apache License 2.0 text is in LICENSES/Apache-2.0.txt. Component-specific copyright
+headers, upstream names and license terms are retained. External models,
+datasets and robot assets retain their own licenses.
