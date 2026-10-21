@@ -78,6 +78,10 @@ host graphics driver. See [system prerequisites and pinned dependencies](docs/IN
 See [resource acquisition](docs/RESOURCES.md) for official benchmark sources,
 directory layouts and the distinction between available resources and pending releases.
 
+
+Pretrain weight: [Phoenix-MWA Joint96 (step 256013)](https://www.modelscope.cn/api/v1/models/ssuuuuu/phoenix-wam/repo?Revision=master&FilePath=phoenix-mwa-pretrain-joint96-step_256013.pt)
+
+
 | Relative location | Contents |
 | --- | --- |
 | `checkpoints/` | Wan components, policy and initialization weights |
