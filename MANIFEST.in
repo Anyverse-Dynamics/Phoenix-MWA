@@ -1,0 +1,18 @@
+include README.md README_zh.md LICENSE NOTICE SHA256SUMS verify_bundle.py run.sh
+include .gitignore
+include requirements-*.txt
+recursive-include configs *.yaml
+recursive-include docs *.md
+recursive-include scripts *.sh
+recursive-include LICENSES *
+recursive-include src/wam/third_party *.md *LICENSE* .source-commit
+prune data
+prune assets
+prune checkpoints
+prune runs
+prune outputs
+prune results
+prune artifacts
+prune tests
+prune provenance
+global-exclude *.py[cod] .DS_Store ._*

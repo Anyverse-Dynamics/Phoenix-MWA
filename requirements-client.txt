@@ -1,0 +1,6 @@
+numpy==1.26.4
+hydra-core==1.3.2
+omegaconf==2.3.0
+msgpack>=1.0.5
+websockets>=14,<17
+pyzmq>=25

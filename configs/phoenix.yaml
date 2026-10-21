@@ -1,0 +1,26 @@
+schema: phoenix.inference.v1
+model_config: configs/phoenix_model.yaml
+checkpoint: checkpoints/phoenix_rtc.pt
+normalization: assets/phoenix_normalization.json
+text_context: assets/phoenix_text.pt
+model_version: REQUIRED_TRAINING_RTC_CHECKPOINT_SHA256
+normalization_sha256: REQUIRED_NORMALIZATION_SHA256
+text_context_sha256: REQUIRED_TEXT_CONTEXT_SHA256
+instruction: REQUIRED_INSTRUCTION
+embodiment: arx_x5
+gripper_unit: m
+device: cuda:0
+host: 127.0.0.1
+port: 8009
+policy_addr: ws://127.0.0.1:8009
+env_addr: tcp://127.0.0.1:5555
+action_horizon: 32
+video_frames: 9
+denoising_steps: 10
+action_hz: 30
+seed: 42
+rtc:
+  method: condition
+  execution_horizon: 16
+  inference_delay: 8
+  max_prefix_steps: 10

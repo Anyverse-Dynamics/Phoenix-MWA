@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "Prometheus"
+version = "0.4.0"
+description = "Modular robot runtime for observations, action scheduling, and recording, with a Phoenix Training RTC example"
+readme = "README.md"
+license = {file = "LICENSE"}
+requires-python = ">=3.10"
+dependencies = ["numpy>=1.23", "hydra-core>=1.3", "omegaconf>=2.3"]
+
+[project.optional-dependencies]
+client = ["msgpack>=1.0.5", "websockets>=14,<17", "pyzmq>=25"]
+hardware = ["pyrealsense2>=2.56", "pynput>=1.7"]
+train = ["accelerate>=0.30", "pyarrow>=14,<21", "av>=12"]
+
+[tool.setuptools]
+license-files = ["LICENSE", "NOTICE", "LICENSES/*"]
+
+[tool.setuptools.package-dir]
+wam = "src/wam"
+
+[tool.setuptools.packages.find]
+where = [".", "src"]
+include = ["phoenix*", "prometheus*", "wam*"]
+
+[tool.setuptools.package-data]
+"prometheus.configs" = ["*.yaml", "*/*.yaml"]
+"wam.third_party" = ["**/*.md", "**/LICENSE*", "**/.source-commit"]
+

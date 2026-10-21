@@ -1,0 +1,13 @@
+-r requirements-client.txt
+einops>=0.8
+transformers>=4.49
+safetensors>=0.4
+Pillow>=10
+imageio>=2.30
+imageio-ffmpeg>=0.5
+accelerate>=0.30
+sentencepiece>=0.2
+ftfy>=6
+regex
+rich>=13
+# Keep the device's validated Torch/torchvision combination.

@@ -1,0 +1,26 @@
+_target_: prometheus.hardware.sensors.realsense.RealsenseLauncher
+name: realsense
+# Map logical camera names to RealSense serials, e.g. `+realsense.cameras.front=123`.
+cameras: {}
+# Logical topic namespace stored in sample metadata and episode layout.
+camera_namespace: /prometheus/sensors/cameras
+width: 640
+height: 480
+# IR defaults to the RGB resolution when these are null.
+ir_width: null
+ir_height: null
+# Requested camera fps; recorder video fps is configured separately.
+fps: 30
+# pyrealsense2 color stream format. Keep RGB8 unless a policy explicitly expects BGR8.
+color_format: RGB8
+# `auto` keeps hardware auto exposure enabled; `fixed` writes exposure_us explicitly.
+exposure_mode: fixed
+exposure_us: 20000.0
+enable_infra: true
+# Optional logical camera names that capture IR1 internally without publishing
+# or recording it. This works around D405 RGB-only profile issues while keeping
+# the public stream schema RGB-only.
+color_companion_infra_cameras: []
+# ROS publisher queue depth for the pyrealsense2-backed image topics.
+qos_depth: 10
+ros_domain_id: null

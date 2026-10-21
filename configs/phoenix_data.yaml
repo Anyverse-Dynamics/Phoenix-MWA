@@ -1,0 +1,53 @@
+schema: phoenix.data_recipe.v1
+conversion:
+  episodes: ${oc.env:PHOENIX_RECORDING_LIST,???}
+  output: data/lerobot
+  robot_parts: [left, right]
+  camera_streams: [base_0_rgb, left_wrist_0_rgb, right_wrist_0_rgb]
+  gripper_unit: m
+  max_robot_alignment_ms: 12.0
+  max_rgb_alignment_ms: 25.0
+  min_output_frames: 45
+  max_abs_joint: 3.2
+  max_joint_step_l2: 1.0
+  trim_static_start: true
+  trim_static_end: true
+  arm_motion_threshold: 0.02
+  gripper_motion_threshold: 0.004
+  motion_sustain_frames: 6
+  motion_preroll_frames: 3
+  motion_postroll_frames: 3
+  min_image_std: 2.0
+  min_image_mean: 2.0
+  max_image_mean: 253.0
+  image_writer_threads: 4
+preparation:
+  dataset_list: data/lerobot/dataset_dirs.json
+  output: data/prepared
+  camera_keys:
+    - observation.images.base_0_rgb
+    - observation.images.left_wrist_0_rgb
+    - observation.images.right_wrist_0_rgb
+  state_key: observation.state.joint
+  action_key: action_abs_joint
+  action_semantics: materialized_next_observation
+  gripper_unit: m
+  holdout: 0.05
+  split_seed: 42
+  normalization: ${oc.env:PHOENIX_NORMALIZATION,null}
+  fit_normalization: false
+text_cache:
+  manifest: data/prepared/manifest.json
+  output: data/text_cache
+  encoder: ${oc.env:PHOENIX_T5_CHECKPOINT,???}
+  tokenizer: ${oc.env:PHOENIX_T5_TOKENIZER,???}
+  device: cuda
+visual_cache:
+  manifest: data/prepared/manifest.json
+  output: data/visual_cache
+  model_definition: configs/phoenix_model.yaml
+  device: cuda
+  chunk_rows: 256
+  rank: 0
+  world_size: 1
+  initialize_only: false

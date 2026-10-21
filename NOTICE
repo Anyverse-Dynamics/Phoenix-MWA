@@ -1,0 +1,32 @@
+Prometheus source notices
+=========================
+
+The prometheus/ and prometheus_env/ runtime and transport packages are
+released under the MIT License in LICENSES/Prometheus-MIT.txt.
+
+The included Phoenix Training RTC example uses the repository's MIT License.
+Original copyright and license headers are retained.
+
+Included third-party components retain their own terms:
+
+- FastWAM-derived model and encoder integration:
+  LICENSES/FastWAM-encoder-LICENSE (MIT).
+  https://github.com/yuantianyuan01/FastWAM
+
+- StarVLA-derived visual encoder integration in src/wam/encoder/:
+  src/wam/third_party/dino_runtime/STARVLA-LICENSE (MIT).
+
+- DINOv3 source subset in src/wam/third_party/dino_runtime/dinov3/:
+  its accompanying LICENSE.md (DINOv3 License Agreement).
+  Copyright (c) Meta Platforms, Inc. and affiliates.
+  https://github.com/facebookresearch/dinov3
+
+- NVIDIA-attributed utility code retains its Apache-2.0 headers;
+  the license text is in LICENSES/Apache-2.0.txt.
+
+Only the DINOv3 runtime subset required by this repository is included;
+upstream cluster scheduling helpers are omitted. Third-party copyright
+headers and license texts are not replaced by the project's MIT License.
+
+Model weights, datasets, camera drivers, and hardware SDK binaries are
+external resources and are not included. Their own licenses apply.

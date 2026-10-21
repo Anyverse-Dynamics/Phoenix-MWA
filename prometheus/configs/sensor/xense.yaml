@@ -1,0 +1,18 @@
+_target_: prometheus.hardware.sensors.xense.XensePublisher
+# Map logical tactile names to Xense serials, e.g. left_wrist_0/right_wrist_1.
+sensors: {}
+topic_prefix: /prometheus/sensors/tactile
+hz: 30.0
+image_width: 700
+image_height: 400
+flow_width: 35
+flow_height: 20
+publish_rectify: false
+publish_difference: true
+# publish_meshflow emits one image-like flow stream plus one pointcloud stream.
+publish_meshflow: true
+require_gpu: true
+# May point either to one flat lib directory or an NVIDIA package root containing */lib/.
+gpu_library_dir: null
+qos_depth: 20
+ros_domain_id: null

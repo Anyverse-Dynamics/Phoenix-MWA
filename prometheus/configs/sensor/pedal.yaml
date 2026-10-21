@@ -1,0 +1,11 @@
+_target_: prometheus.hardware.sensors.pedal.PedalPublisher
+topic: /prometheus/input/pedal_cmd
+backend: evdev
+# Stable udev path is preferred over /dev/input/eventN.
+device: /dev/input/prometheus-pedal
+ros_domain_id: null
+rate_hz: 50.0
+# Exit/commit commands require repeated presses inside this window.
+confirm_presses: 2
+confirm_window_s: 1.0
+debounce_s: 0.25

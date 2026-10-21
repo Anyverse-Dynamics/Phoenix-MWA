@@ -1,0 +1,49 @@
+# Local environments and build outputs
+.venv/
+.venv-data/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.cache/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Private resource configuration and credentials
+.env
+.env.*
+!.env.example
+*.local.yaml
+*.local.yml
+*.local.sh
+*.pem
+*.key
+credentials.json
+
+# External assets and generated outputs
+checkpoints/
+assets/
+data/
+runs/
+outputs/
+results/
+artifacts/
+*.pt
+*.pth
+*.safetensors
+*.npz
+*.parquet
+*.mp4
+*.log
+*.tar
+*.tar.gz
+*.zip
+
+# Editor and operating-system metadata
+.DS_Store
+._*
+.idea/
+.vscode/

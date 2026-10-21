@@ -1,0 +1,4 @@
+-r requirements-model.txt
+pyarrow>=14,<21
+av>=12
+# Optional for distributed.deepspeed_zero1=true: keep the device-validated DeepSpeed.

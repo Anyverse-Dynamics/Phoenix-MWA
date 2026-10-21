@@ -1,0 +1,63 @@
+schema: phoenix.training_rtc_recipe.v1
+initialization:
+  checkpoint: ${oc.env:PHOENIX_PRETRAINED_CHECKPOINT,???}
+  sha256: ${oc.env:PHOENIX_PRETRAINED_SHA256,???}
+  expected_step: null
+  mode: weights_only
+  resume_optimizer: false
+model_definition: configs/phoenix_model.yaml
+output_dir: runs/phoenix_training_rtc
+resume_state: null
+data:
+  manifest: ${oc.env:PHOENIX_MANIFEST,???}
+  normalization: ${oc.env:PHOENIX_NORMALIZATION,???}
+  normalization_sha256: ${oc.env:PHOENIX_NORMALIZATION_SHA256,???}
+  text_cache_index: ${oc.env:PHOENIX_TEXT_INDEX,???}
+  visual_cache_index: ${oc.env:PHOENIX_VISUAL_CACHE_INDEX,null}
+  embodiment_id: 2
+  gripper_unit: m
+training:
+  batch_size: 1
+  gradient_accumulation_steps: 1
+  num_workers: 4
+  seed: 42
+  mixed_precision: bf16
+  max_steps: 20000
+  learning_rate: 5.0e-5
+  min_learning_rate: 5.0e-7
+  warmup_steps: null
+  weight_decay: 0.01
+  betas: [0.9, 0.999]
+  eps: 1.0e-8
+  max_grad_norm: 1.0
+  save_every: 5000
+validation:
+  every: 5000
+  samples: 128
+  seed: 20261021
+distributed:
+  cpu: false
+  deepspeed_zero1: false
+sampling:
+  action_horizon: 32
+  raw_window_frames: 33
+  inference_video_frames: 9
+  action_hz: 30
+training_time_rtc:
+  enabled: true
+  method: condition
+  start_step: 0
+  max_prefix_steps: 10
+  no_prefix_probability: 0.0
+  prefix_sampling: uniform_inclusive
+  prefix_timestep: 0
+  prefix_in_loss: false
+  prepare_target: phoenix.training.prepare_training_rtc
+  loss_target: phoenix.losses._joint96_training_loss
+evaluation:
+  action_horizon: 32
+  video_frames: 9
+  denoising_steps: 10
+checkpoint:
+  metadata_schema: phoenix.training_rtc.v1
+  output: ${output_dir}/checkpoints/step_XXXXXX/weights.pt

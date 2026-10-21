@@ -1,0 +1,21 @@
+# ARX5 hardware type template. Workflow configs must provide the concrete
+# robot id, CAN mapping, and gripper calibration for the machine they run on.
+id: arx5
+ros_domain_id: null
+can:
+  left: ???
+  right: ???
+gripper_open_readout:
+  left: ???
+  right: ???
+control_hz: 120.0
+gripper_width_m: 0.082
+action_space: abs_qpos
+sdk:
+  _target_: prometheus.hardware.robots.arx5.Arx5
+  robot_id: ${..id}
+  can: ${..can}
+  gripper_open_readout: ${..gripper_open_readout}
+  control_hz: ${..control_hz}
+  gripper_width_m: ${..gripper_width_m}
+  action_space: ${..action_space}

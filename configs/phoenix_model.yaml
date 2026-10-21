@@ -1,0 +1,112 @@
+# Phoenix Joint96 structural template; checkpoint tensors are strictly matched.
+model:
+  _target_: wam.model.factory.create_wam
+  model_id: Wan-AI/Wan2.2-TI2V-5B
+  tokenizer_model_id: Wan-AI/Wan2.1-T2V-1.3B
+  tokenizer_max_len: 128
+  load_text_encoder: false
+  proprio_dim: 80
+  redirect_common_files: true
+  mot_checkpoint_mixed_attn: false
+  mot_attention_backend: sdpa
+  mot_flex_block_size: 64
+  action_dit_pretrained_path: null
+  action_dit_use_interpolated_init: false
+  skip_dit_load_from_pretrain: false
+  video_dit_config:
+    has_image_input: false
+    patch_size:
+    - 1
+    - 2
+    - 2
+    in_dim: 96
+    hidden_dim: 3072
+    ffn_dim: 14336
+    freq_dim: 256
+    text_dim: 4096
+    out_dim: 96
+    num_heads: 24
+    attn_head_dim: 128
+    num_layers: 30
+    eps: 1.0e-06
+    seperated_timestep: true
+    require_clip_embedding: false
+    require_vae_embedding: false
+    fuse_vae_embedding_in_latents: true
+    use_gradient_checkpointing: true
+    video_attention_mask_mode: first_frame_causal
+    action_conditioned: false
+    action_dim: 80
+    action_group_causal_mask_mode: group_diagonal
+  action_dit_config:
+    training_time_rtc:
+      enabled: true
+      max_delay_steps: 10
+    action_dim: 80
+    hidden_dim: 1024
+    ffn_dim: 4096
+    num_heads: 24
+    attn_head_dim: 128
+    num_layers: 30
+    text_dim: 4096
+    freq_dim: 256
+    eps: 1.0e-06
+    use_gradient_checkpointing: true
+    num_embodiments: 28
+    soft_prompt_tokens: 8
+    embodiment_registry_path: null
+  video_scheduler:
+    train_shift: 6.0
+    infer_shift: 6.0
+    num_train_timesteps: 1000
+  action_scheduler:
+    train_shift: 1.0
+    infer_shift: 1.0
+    num_train_timesteps: 1000
+  loss:
+    lambda_video: 1.0
+    lambda_action: 1.0
+  future_delta:
+    enabled: false
+  understanding:
+    enabled: false
+  memory:
+    enabled: false
+    video:
+      enabled: false
+      num_anchor_frames: 0
+      num_recent_frames: 0
+      deduplicate_identical_anchor_batch: true
+  joint96_three_view: true
+  mot_checkpoint_layer_stride: 1
+  mot_flex_masked_batches: true
+  mot_flex_training_kernel_options:
+    fwd_BLOCK_M: 64
+    fwd_BLOCK_N: 64
+    fwd_num_stages: 2
+    bwd_BLOCK_M1: 64
+    bwd_BLOCK_N1: 64
+    bwd_BLOCK_M2: 64
+    bwd_BLOCK_N2: 64
+    bwd_num_stages: 2
+  distillation:
+    enabled: false
+  joint_visual_codec:
+    source_root: bundled://dino-stvae-v1
+    source_sha256: null
+    stvae_checkpoint_path: ${oc.env:PHOENIX_STVAE_CHECKPOINT}
+    expected_stvae_step: 150000
+    dino_kwargs:
+      checkpoint_path: ${oc.env:PHOENIX_ENCODER_CHECKPOINT}
+      checkpoint_state: ema_student
+      output_source: backbone
+      projection_mode: raw
+      projector_out_dim: 1024
+      projector_state_path: null
+      feature_norm_state_path: null
+      require_feature_norm: false
+      dinov3_source_commit: 6876159a11b4df116f30f667f8c9888617df0751
+      verify_source_commit: false
+      strict_load: true
+      image_size: 256
+      patch_size: 16

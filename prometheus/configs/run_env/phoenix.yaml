@@ -1,0 +1,136 @@
+# @package _global_
+
+defaults:
+  # Hardware type templates. This workflow config supplies the physical values.
+  - /robot/arx5@robot
+  - /sensor/realsense@realsense
+  - /sensor/xense@xense
+  - _self_
+
+# Configure the CAN interfaces for the target robot.
+robot:
+  id: phoenix_arx
+  ros_domain_id: 21
+  can:
+    left: SET_CAN_LEFT
+    right: SET_CAN_RIGHT
+  gripper_open_readout:
+    left: 0.0
+    right: 0.0
+
+env:
+  # ZMQ REP endpoint for third-party policy clients.
+  addr: tcp://127.0.0.1:5555
+  # Keep real observation/control timing but skip the final SDK send_action().
+  dry_run: true
+  # Print dry-run action diagnostics every N env.step() calls; 0 disables it.
+  action_log_interval: 1
+  robot_topic_root: /prometheus/robots
+  ros_domain_id: ${robot.ros_domain_id}
+  qos_depth: 10
+  obs_history: 8
+  ready_obs_keys:
+    - robot/qpos
+  default_obs_keys:
+    - robot/qpos
+  reset_timeout_s: 20.0
+  step_timeout_s: null
+  wait_ready_timeout_s: 20.0
+  action_hz: 30
+  max_chunk_horizon: 32
+  # 0 means policy waits until the submitted chunk is fully sent.
+  policy_low_watermark: 8
+  fixed_chunk_switch: true
+  # Submit-time queue rewrite policy. `_partial_: true` makes function targets callable at runtime.
+  action_rewriter:
+    _target_: prometheus.runtime.scheduler.replace_pending
+    _partial_: true
+  # Direct keyboard episode control from the run_env terminal.
+  # s -> terminated/save, q -> truncated/abort.
+  keyboard:
+    enabled: true
+
+recording:
+  # Enable with `recording.enabled=true` when a policy rollout should be saved.
+  enabled: false
+  root: ./data/run_env/phoenix_arx
+  episode_prefix: rollout
+  start_index: 1
+  # Critical bounded queue: no drop. Overflow fails the rollout instead of corrupting data.
+  recorder_queue: 8192
+  tactile_bundle_timeout_ns: 500000000
+  media_fps: 30.0
+  ffmpeg: ffmpeg
+  # RGB video quality; IR/tactile lossless FFV1 streams are unaffected.
+  video_codec: libx264
+  video_crf: 14
+  video_preset: veryfast
+  # Save robot-state and tactile pointcloud diagnostics after raw episode data.
+  write_visualizations: true
+  visualization_dpi: 220
+
+preview:
+  # Enable with `head-preview`, `sensor-preview`, or `preview.enabled=true`.
+  # Default preview stays dependency-light and shows the original head/base camera.
+  # Modes:
+  #   single: original in-process head camera ffplay preview.
+  #   ros_mosaic: V2-style sidecar preview subscribing to ROS image topics.
+  #   mosaic: experimental in-process ffplay mosaic, kept for compatibility.
+  enabled: false
+  mode: single
+  stream_key: base_0_rgb
+  stream_rows:
+    -
+      - key: base_0_rgb
+        label: base rgb
+      - key: left_wrist_0_rgb
+        label: left rgb
+      - key: right_wrist_0_rgb
+        label: right rgb
+    -
+      - key: left_wrist_0_difference
+        label: left0 tactile diff
+      - key: left_wrist_1_difference
+        label: left1 tactile diff
+      - key: right_wrist_0_difference
+        label: right0 tactile diff
+      - key: right_wrist_1_difference
+        label: right1 tactile diff
+  fps: 30.0
+  width: 1280
+  height: 720
+  stale_timeout_s: 1.0
+  ffplay: ffplay
+  window_title: Prometheus head camera
+  # ros_mosaic needs ROS Humble's Python 3.10 rclpy and a GUI-enabled OpenCV.
+  python_executable: /usr/bin/python3
+
+eef_trace:
+  # Lightweight debug trace for chunk-vs-EEF jitter analysis.
+  enabled: false
+  root: ./data/run_env/phoenix_arx/eef_trace
+  episode_prefix: eef_trace
+  start_index: 1
+  part: right
+  write_csv: true
+  write_png: true
+  png_dpi: 180
+  write_svg: false
+
+realsense:
+  enabled: true
+  cameras:
+    base_0: "SET_CAMERA_MAIN"
+    left_wrist_0: "SET_CAMERA_LEFT"
+    right_wrist_0: "SET_CAMERA_RIGHT"
+
+xense:
+  # Keep tactile disabled by default. Enable it explicitly only for tactile rollouts.
+  enabled: false
+  # Sensor publication rate, independent of the model's action chunk length.
+  hz: 30.0
+  sensors:
+    left_wrist_0: "SET_TACTILE_LEFT_0"
+    left_wrist_1: "SET_TACTILE_LEFT_1"
+    right_wrist_0: "SET_TACTILE_RIGHT_0"
+    right_wrist_1: "SET_TACTILE_RIGHT_1"
