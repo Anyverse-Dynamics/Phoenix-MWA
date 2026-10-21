@@ -1,0 +1,28 @@
+{
+  "schema": "phoenix.robocasa.inference.v1",
+  "purpose": "inference",
+  "action_space": "delta80_slot18",
+  "contract": {
+    "version": "robocasa_gr1_canonical80_native_delta_slot18_v1",
+    "world_axes": "source_world_A_identity",
+    "ee_axes": "source_wrist_B_identity",
+    "translation": "action_xyz[t]-state_xyz[t]",
+    "rotation": "Log(state_R[t].T@action_R[t])",
+    "rotation6d": "first_two_columns_concatenated",
+    "source_action_offset": 0,
+    "joint_hand_waist": "absolute_source_action",
+    "controller": "absolute_joint29",
+    "embodiment_id": 18
+  },
+  "text": {
+    "mode": "online_t5",
+    "instruction_source": "observation:annotation.human.coarse_action",
+    "prompt_transform": "robocasa_delta.prompt_for",
+    "context_len": 128,
+    "context_dim": 4096,
+    "dtype": "bfloat16",
+    "padding": "zero_context_full_attention"
+  },
+  "tasks": "tasks.json",
+  "scene_seeds": "scene_seed_list.json"
+}

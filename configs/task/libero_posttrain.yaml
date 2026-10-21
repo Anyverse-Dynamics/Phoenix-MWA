@@ -1,0 +1,25 @@
+# @package _global_
+defaults:
+  - libero_joint96_cached_flu_bi_robot_softprompt
+  - _self_
+
+# Weights-only LIBERO post-training; initialization step is explicitly configured.
+joint96_posttrain:
+  expected_pretrain_step: null # deprecated; actual step is read from checkpoint
+learning_rate: 5.0e-5
+min_learning_rate: 5.0e-7
+batch_size: 8
+gradient_accumulation_steps: 1
+num_epochs: 50
+max_steps: null
+resume: null
+save_every: 5000
+eval_every: 0
+max_weight_checkpoints: 15
+save_training_state: true
+save_on_train_end: true
+
+model:
+  loss:
+    lambda_video: 1.0
+    lambda_action: 1.0

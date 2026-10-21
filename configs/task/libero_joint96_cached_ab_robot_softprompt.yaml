@@ -1,0 +1,38 @@
+# @package _global_
+defaults:
+  - libero_joint96_cached_ab
+  - _self_
+
+local_robot_softprompt:
+  enabled: true
+  registry_path: ${oc.env:EMBODIMENT_REGISTRY,configs/embodiment_registry/local_robot_arm18_capacity28_v1.json}
+  init_checkpoint: null
+  expected_init_step: null
+
+joint96_posttrain:
+  expected_pretrain_step: null # deprecated; actual step is read from checkpoint
+  libero_softprompt:
+    enabled: true
+    embodiment_id: 0
+
+model:
+  joint_visual_codec:
+    expected_stvae_step: null # deprecated; read from encoder checkpoint
+    stvae_checkpoint_path: ${oc.env:STVAE_CHECKPOINT}
+  action_dit_config:
+    num_embodiments: 28
+    soft_prompt_tokens: 8
+    embodiment_registry_path: ${local_robot_softprompt.registry_path}
+
+data:
+  train:
+    visual_cache:
+      pair_binding_file: ${oc.env:LIBERO_PAIR_BINDING}
+  val:
+    visual_cache: ${data.train.visual_cache}
+
+batch_size: 8
+gradient_accumulation_steps: 1
+resume: null
+num_epochs: 50
+max_steps: null

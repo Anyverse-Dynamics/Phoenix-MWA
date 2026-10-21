@@ -1,0 +1,31 @@
+{
+  "schema": "wam.embodiment_registry.v1",
+  "description": "Example profile mapping with eleven slots; customize names and profile IDs for your data.",
+  "num_embodiments": 11,
+  "embodiments": [
+    "arm_00",
+    "arm_01",
+    "arm_02",
+    "arm_03",
+    "arm_04",
+    "arm_05",
+    "arm_06",
+    "arm_07",
+    "arm_08",
+    "arm_09",
+    "arm_10"
+  ],
+  "profile_to_embodiment_id": {
+    "example_profile_00": 0,
+    "example_profile_01": 1,
+    "example_profile_02": 2,
+    "example_profile_03": 3,
+    "example_profile_04": 4,
+    "example_profile_05": 5,
+    "example_profile_06": 6,
+    "example_profile_07": 7,
+    "example_profile_08": 8,
+    "example_profile_09": 9,
+    "example_profile_10": 10
+  }
+}

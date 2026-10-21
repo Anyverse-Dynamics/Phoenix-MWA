@@ -1,0 +1,14 @@
+# @package _global_
+defaults:
+  - joint96_posttrain_base
+  - override /data: libero_joint96
+  - _self_
+
+joint96_posttrain:
+  # Contract checked against the shared training/inference mask implementation.
+  action_video_attention: current_and_noisy_future_v1
+
+batch_size: 16
+num_epochs: 15
+gradient_accumulation_steps: 1
+save_every: 1000

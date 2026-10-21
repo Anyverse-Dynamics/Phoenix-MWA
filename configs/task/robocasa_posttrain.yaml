@@ -1,0 +1,62 @@
+# @package _global_
+# RoboCasa Delta80 slot18 post-training with explicit initialization resources.
+defaults:
+  - joint96_posttrain_base
+  - override /data: robocasa_joint96_cached
+  - _self_
+
+joint96_posttrain:
+  cached_visuals: true
+  expected_pretrain_step: null # deprecated; actual step is read from checkpoint
+  robocasa:
+    enabled: true
+    require_episode_remarks: true
+    embodiment_id: 18
+    frame_contract: robocasa_gr1_canonical80_native_delta_slot18_v1
+local_robot_softprompt:
+  enabled: true
+  registry_path: ${oc.env:ROBOCASA_REGISTRY}
+  init_checkpoint: null
+  expected_init_step: null
+model:
+  _target_: wam.training.robocasa_posttrain.create_robocasa_wam
+  mot_attention_backend: sdpa
+  mot_flex_masked_batches: false
+  mot_compile_mode: 'off'
+  action_dit_config:
+    num_embodiments: 28
+    soft_prompt_tokens: 8
+    embodiment_registry_path: ${local_robot_softprompt.registry_path}
+  joint_visual_codec:
+    expected_stvae_step: null # deprecated; read from encoder checkpoint
+  video_scheduler:
+    train_shift: 6.0
+    infer_shift: 6.0
+  action_scheduler:
+    train_shift: 1.0
+    infer_shift: 1.0
+  loss:
+    lambda_video: 1.0
+    lambda_action: 1.0
+    lambda_vae: 0.5
+    lambda_stvae: 0.5
+batch_size: 8
+gradient_accumulation_steps: 1
+num_workers: 8
+num_epochs: 50
+max_steps: 60000
+learning_rate: 1.0e-4
+min_learning_rate: 5.0e-7
+warmup_steps: null
+seed: 42
+save_every: 5000
+max_weight_checkpoints: 20
+save_on_train_end: false
+save_training_state: false
+eval_every: 0
+eval_max_videos: 0
+cache_locality_sampling:
+  enabled: false
+  episodes_per_batch: 1
+wandb:
+  enabled: false

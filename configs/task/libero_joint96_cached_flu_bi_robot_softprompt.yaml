@@ -1,0 +1,13 @@
+# @package _global_
+defaults:
+  - libero_joint96_cached_ab_robot_softprompt
+  - override /data: libero_joint96_cached_flu_bi
+  - _self_
+joint96_posttrain:
+  expected_pretrain_step: null # deprecated; actual step is read from checkpoint
+  libero_frame_contract: libero_osc_flu_b_identity_v1
+batch_size: 8
+gradient_accumulation_steps: 1
+resume: null
+num_epochs: 50
+max_steps: null

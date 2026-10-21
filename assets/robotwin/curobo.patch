@@ -1,0 +1,57 @@
+diff --git a/src/curobo/content/configs/task/finetune_trajopt.yml b/src/curobo/content/configs/task/finetune_trajopt.yml
+index fc03e5f..93a3f8b 100644
+--- a/src/curobo/content/configs/task/finetune_trajopt.yml
++++ b/src/curobo/content/configs/task/finetune_trajopt.yml
+@@ -93,7 +93,7 @@ lbfgs:
+   use_cuda_graph: True
+   n_problems: 1
+   store_debug: False
+-  use_cuda_kernel: True
++  use_cuda_kernel: False
+   stable_mode: True
+   line_search_type: "approx_wolfe"
+   use_cuda_line_search_kernel: True
+diff --git a/src/curobo/content/configs/task/finetune_trajopt_slow.yml b/src/curobo/content/configs/task/finetune_trajopt_slow.yml
+index b0e6e60..4403c0b 100644
+--- a/src/curobo/content/configs/task/finetune_trajopt_slow.yml
++++ b/src/curobo/content/configs/task/finetune_trajopt_slow.yml
+@@ -91,7 +91,7 @@ lbfgs:
+   use_cuda_graph: True
+   n_problems: 1
+   store_debug: False
+-  use_cuda_kernel: True
++  use_cuda_kernel: False
+   stable_mode: True
+   line_search_type: "approx_wolfe"
+   use_cuda_line_search_kernel: True
+diff --git a/src/curobo/content/configs/task/gradient_ik.yml b/src/curobo/content/configs/task/gradient_ik.yml
+index e4aef7d..5722aae 100644
+--- a/src/curobo/content/configs/task/gradient_ik.yml
++++ b/src/curobo/content/configs/task/gradient_ik.yml
+@@ -77,7 +77,7 @@ lbfgs:
+   use_cuda_graph: True
+   n_problems: 1
+   store_debug: False
+-  use_cuda_kernel: True
++  use_cuda_kernel: False
+   use_shared_buffers_kernel: True
+   stable_mode: True
+   line_search_type: "approx_wolfe" #"wolfe"
+@@ -90,4 +90,3 @@ lbfgs:
+   debug_info:
+     visual_traj       : null #'ee_pos_seq'
+ 
+-
+diff --git a/src/curobo/content/configs/task/gradient_trajopt.yml b/src/curobo/content/configs/task/gradient_trajopt.yml
+index 5687492..5c36311 100644
+--- a/src/curobo/content/configs/task/gradient_trajopt.yml
++++ b/src/curobo/content/configs/task/gradient_trajopt.yml
+@@ -93,7 +93,7 @@ lbfgs:
+   use_cuda_graph: True
+   n_problems: 1
+   store_debug: False
+-  use_cuda_kernel: True
++  use_cuda_kernel: False
+   stable_mode: True
+   line_search_type: "approx_wolfe"
+   use_cuda_line_search_kernel: True
