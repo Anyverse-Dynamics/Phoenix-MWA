@@ -78,7 +78,6 @@ The `train` extra installs DeepSpeed, and `logging` installs W&B.
 Simulator packages are not required.
 
 ## Prepare Data and Weights
-Pretrain weight: [Phoenix-MWA Joint96 (step 256013)](https://www.modelscope.cn/api/v1/models/ssuuuuu/phoenix-wam/repo?Revision=master&FilePath=phoenix-mwa-pretrain-joint96-step_256013.pt)
 Prepare the complete `resources/` package before launching. It contains the Wan
 DiT initialization, WanVAE, Phoenix Encoder, CS-VAE, dataset manifests and
 precomputed text contexts. **A Git clone alone does not include these resources.**
