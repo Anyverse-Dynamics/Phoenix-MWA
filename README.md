@@ -19,7 +19,7 @@
 This is the **main branch of Phoenix-MWA**, providing the **world–action pretraining code**. Other components are organized into dedicated branches:
 
 - **Post-training & benchmark evaluation:** See the [post-train branch](https://github.com/OpenPhoenix-Team/Phoenix-MWA/tree/post-train).
-- **Encoder pretraining (dual-teacher distillation):** See the `encoder` branch *(coming soon)*.
+- **Encoder pretraining (dual-teacher distillation & CS-VAE training):** See the `encoder` branch *(coming soon)*.
 - **Data processing pipeline:** See the `data` branch *(coming soon)*.
 - **Real-world RTC training & asynchronous inference deployment:** See the `rtc` branch *(coming soon)*.
 
