@@ -1,10 +1,10 @@
 <p align="center">
-  <a href="https://anyverse.com/"><img src="docs/assets/anyverse-dynamics-logo.webp" alt="Anyverse Dynamics" height="30" align="middle"></a>&emsp;
-  <a href="https://github.com/OpenPhoenix-Team"><img src="docs/assets/openphoenix-team-logo.webp" alt="OpenPhoenix Team" height="36" align="middle"></a>&nbsp;<strong>OpenPhoenix Team</strong>&emsp;
-  <img src="docs/assets/drl-casia-transparent.png" alt="DRL CASIA" height="36" align="middle">&emsp;
-  <img src="docs/assets/casia-transparent.png" alt="Institute of Automation, Chinese Academy of Sciences" height="36" align="middle">&emsp;
-  <img src="docs/assets/tsinghua-transparent.png" alt="Tsinghua University" height="36" align="middle">&emsp;
-  <img src="docs/assets/nus-transparent.png" alt="National University of Singapore" height="36" align="middle">
+  <a href="https://anyverse.com/"><img src="docs/assets/anyverse-dynamics-logo.webp" alt="Anyverse Dynamics" height="34" align="middle"></a>&emsp;
+  <a href="https://github.com/OpenPhoenix-Team"><img src="docs/assets/openphoenix-team-logo.webp" alt="" height="42" align="middle">&nbsp;<img src="docs/assets/openphoenix-wordmark.svg" alt="OpenPhoenix Team" width="135" height="42" align="middle"></a>&emsp;
+  <img src="docs/assets/drl-casia-transparent.png" alt="DRL CASIA" height="42" align="middle">&emsp;
+  <img src="docs/assets/casia-transparent.png" alt="Institute of Automation, Chinese Academy of Sciences" height="42" align="middle">&emsp;
+  <img src="docs/assets/tsinghua-transparent.png" alt="Tsinghua University" height="42" align="middle">&emsp;
+  <img src="docs/assets/nus-transparent.png" alt="National University of Singapore" height="42" align="middle">
 </p>
 
 <p align="center">
