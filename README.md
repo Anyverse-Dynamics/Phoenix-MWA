@@ -147,3 +147,11 @@ Phoenix builds on FastWAM, Wan, StarVLA, DINOv3 and LeRobot.
 Source attribution is retained in [NOTICE](NOTICE), [LICENSE](LICENSE),
 [`LICENSES/`](LICENSES/) and the bundled vendor tree. Model weights and datasets
 remain subject to their respective licenses.
+
+## Contact
+
+Welcome to join us to share experimental results, ask questions, and exchange different viewpoints:
+
+<p align="center">
+  <img src="docs/assets/wechat-group-qr.jpg" alt="MWA-Phoenix WeChat group QR code" width="420">
+</p>
