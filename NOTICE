@@ -1,6 +1,29 @@
-Phoenix pretraining is developed by the Phoenix team under the MIT license
-in LICENSE. The following adapted third-party components retain their
-original attribution:
+Phoenix-MWA licensing notice
+
+From the licensing update dated 2026-10-23, original material owned by or
+licensed for distribution by Anyverse Dynamics is offered under the
+Phoenix-MWA Academic Research License 1.0 in LICENSE, subject to the exclusions
+and prior grants described there. Commercial licensing inquiries:
+zhengyupeng18@mails.ucas.ac.cn.
+
+Before this update, the main branch at commit
+de22718908d61529bd0fce2533fc7053e5cf4ec8
+carried the MIT License. Its text and original attribution are preserved in
+LICENSES/Phoenix-MWA-legacy-MIT.txt. Earlier MIT grants remain available for
+the material they cover, including commercial-use permissions. This update
+does not retroactively restrict those grants or claim third-party ownership.
+
+The institution logos in docs/assets/ were copied from the Phoenix project
+page (https://openphoenix-team.github.io/Phoenix-pages/). They identify
+Anyverse Dynamics, DRL CASIA, CASIA, Tsinghua University, and the National
+University of Singapore. All trademarks remain with their respective owners;
+the software license does not grant trademark rights or imply endorsement.
+
+Third-party attribution
+-----------------------
+
+Phoenix pretraining includes the following adapted third-party components,
+which retain their original attribution and licenses:
 
 - FastWAM visual encoder implementation, adapted for the Phoenix CS-VAE:
   src/wam/model/modules/codecs/dino_csvae/,

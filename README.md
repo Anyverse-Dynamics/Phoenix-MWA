@@ -1,3 +1,14 @@
+<p align="center">
+  <a href="https://anyverse.com/"><img src="docs/assets/anyverse-dynamics-logo.webp" alt="Anyverse Dynamics" width="240"></a>
+</p>
+
+<p align="center">
+  <img src="docs/assets/drl-casia-transparent.png" alt="DRL CASIA" height="56">&nbsp;&nbsp;
+  <img src="docs/assets/casia-transparent.png" alt="Institute of Automation, Chinese Academy of Sciences" height="56">&nbsp;&nbsp;
+  <img src="docs/assets/tsinghua-transparent.png" alt="Tsinghua University" height="56">&nbsp;&nbsp;
+  <img src="docs/assets/nus-transparent.png" alt="National University of Singapore" height="56">
+</p>
+
 <h1 align="center">
   <img src="docs/assets/phoenix-mwa-title.png" alt="Phoenix-MWA" width="800">
 </h1>
@@ -13,7 +24,8 @@
   <a href="#overview">Overview</a> ·
   <a href="#getting-started">Getting Started</a> ·
   <a href="docs/TRAINING.md">Training</a> ·
-  <a href="docs/RESOURCES.md">Resources</a>
+  <a href="docs/RESOURCES.md">Resources</a> ·
+  <a href="#license-and-commercial-use">License</a>
 </p>
 
 This is the **main branch of Phoenix-MWA**, providing the **world–action pretraining code**. Other components are organized into dedicated branches:
@@ -147,6 +159,36 @@ Phoenix builds on FastWAM, Wan, StarVLA, DINOv3 and LeRobot.
 Source attribution is retained in [NOTICE](NOTICE), [LICENSE](LICENSE),
 [`LICENSES/`](LICENSES/) and the bundled vendor tree. Model weights and datasets
 remain subject to their respective licenses.
+
+## License and Commercial Use
+
+**Free for noncommercial academic research and education. Commercial use requires
+a separate written license from Anyverse Dynamics (无界动力).**
+
+The [Phoenix-MWA Academic Research License 1.0](LICENSE) permits academic use,
+reproduction, modification, benchmarking, publication of results, and sharing
+of covered code and modifications without a fee or a separate application.
+Copies and modifications must retain the license and attribution notices.
+Commercial products, services, deployments, and internal commercial development
+require separate authorization. Contact
+[zhengyupeng18@mails.ucas.ac.cn](mailto:zhengyupeng18@mails.ucas.ac.cn).
+
+Anyverse Dynamics retains ownership and commercial licensing rights in its
+original Phoenix-MWA materials. This does not claim ownership of third-party
+components or independently authored research results. Institution logos are
+used for identification and remain the property of their respective owners.
+
+**Earlier MIT releases keep their existing permissions, including commercial
+use.** This change is not retroactive. See [NOTICE](NOTICE) and the preserved
+[legacy MIT license](LICENSES/Phoenix-MWA-legacy-MIT.txt). Third-party code,
+external model weights, and datasets retain their own licenses; this repository
+license does not relicense them. This is a **source-available academic license**,
+not an OSI-approved open-source license.
+
+中文说明：本许可覆盖的原创代码允许免费用于非商业学术研究、教学、复现、修改和分享；
+商业产品、服务、部署及内部商业研发须取得无界动力另行书面授权。
+无界动力保留其原创内容的所有权和商业授权权利；此前 MIT 版本已经授予的权利不受影响，
+第三方代码、模型和数据仍遵循各自协议。
 
 ## Contact
 
