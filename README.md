@@ -1,7 +1,7 @@
 <p align="center">
   <a href="https://anyverse.com/"><img src="docs/assets/anyverse-dynamics-logo.webp" alt="Anyverse Dynamics" height="38" align="middle"></a>
   &emsp;&emsp;
-  <a href="https://github.com/OpenPhoenix-Team"><img src="docs/assets/openphoenix-team-logo.webp" alt="OpenPhoenix Team" height="42" align="middle">&nbsp; <strong>OpenPhoenix Team</strong></a>
+  <a href="https://github.com/OpenPhoenix-Team"><img src="docs/assets/openphoenix-team-logo.webp" alt="OpenPhoenix Team" height="42" align="middle"></a>&nbsp; <strong>OpenPhoenix Team</strong>
 </p>
 
 <p align="center">
