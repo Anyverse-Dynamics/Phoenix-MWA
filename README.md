@@ -1,7 +1,10 @@
 <p align="center">
-  <a href="https://anyverse.com/"><img src="docs/assets/anyverse-dynamics-logo.webp" alt="Anyverse Dynamics" height="38" align="middle"></a>
-  &emsp;&emsp;
-  <a href="https://github.com/OpenPhoenix-Team"><img src="docs/assets/openphoenix-team-logo.webp" alt="OpenPhoenix Team" height="42" align="middle"></a>&nbsp; <strong>OpenPhoenix Team</strong>
+  <a href="https://anyverse.com/"><img src="docs/assets/anyverse-dynamics-logo.webp" alt="Anyverse Dynamics" height="30" align="middle"></a>&emsp;
+  <a href="https://github.com/OpenPhoenix-Team"><img src="docs/assets/openphoenix-team-logo.webp" alt="OpenPhoenix Team" height="36" align="middle"></a>&nbsp;<strong>OpenPhoenix Team</strong>&emsp;
+  <img src="docs/assets/drl-casia-transparent.png" alt="DRL CASIA" height="36" align="middle">&emsp;
+  <img src="docs/assets/casia-transparent.png" alt="Institute of Automation, Chinese Academy of Sciences" height="36" align="middle">&emsp;
+  <img src="docs/assets/tsinghua-transparent.png" alt="Tsinghua University" height="36" align="middle">&emsp;
+  <img src="docs/assets/nus-transparent.png" alt="National University of Singapore" height="36" align="middle">
 </p>
 
 <p align="center">
@@ -9,13 +12,6 @@
 </p>
 
 <p align="center"><strong>Learning Generalizable World–Action Models<br>with Structural and Semantic Representations</strong></p>
-
-<p align="center">
-  <img src="docs/assets/drl-casia-transparent.png" alt="DRL CASIA" height="42">&emsp;
-  <img src="docs/assets/casia-transparent.png" alt="Institute of Automation, Chinese Academy of Sciences" height="42">&emsp;
-  <img src="docs/assets/tsinghua-transparent.png" alt="Tsinghua University" height="42">&emsp;
-  <img src="docs/assets/nus-transparent.png" alt="National University of Singapore" height="42">
-</p>
 
 <p align="center">
   <a href="https://openphoenix-team.github.io/Phoenix-pages/"><img src="https://img.shields.io/badge/Project%20Page-Blog post-blue?style=flat&amp;logo=github" alt="Project Page"></a>
