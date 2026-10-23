@@ -5,6 +5,26 @@ Run commands from the repository root. Keep downloaded resources under ignored
 Official sources below describe their own data/model/asset terms. Source code,
 weights, datasets and simulator assets are separate releases.
 
+## Pretraining checkpoint
+
+The Robot37 Joint96 checkpoint at step 256013 is available from
+[OpenPhoenix/Phoenix-Pretrain](https://huggingface.co/OpenPhoenix/Phoenix-Pretrain)
+and its [AnyverseDynamics mirror](https://huggingface.co/AnyverseDynamics/Phoenix-Pretrain).
+Download it and set the initialization path before sourcing a machine example:
+
+```bash
+hf download OpenPhoenix/Phoenix-Pretrain pretrain_256013.pt \
+  --local-dir resources/pretrain
+export WAM_PRETRAIN_CHECKPOINT="$PWD/resources/pretrain/pretrain_256013.pt"
+```
+
+All three post-training launchers accept this environment variable. The file
+contains the pretrained video/action experts and proprioception encoder;
+download the frozen visual encoders and Wan/text components separately as
+described below. It initializes a new post-training run and does not include
+optimizer or scheduler state. The released RoboTwin policy was initialized
+from the earlier Robot37 step-230000 checkpoint.
+
 ## Phoenix policies and encoders
 
 Published model links are listed in the README Model Zoo; entries marked coming
@@ -67,6 +87,7 @@ checkpoints/
     tokenizer.json
     tokenizer_config.json
 resources/
+  pretrain/pretrain_256013.pt
   encoders/{dino110k.pt,csvae.pt}
   robocasa/{simulator/,environments/}
 ```

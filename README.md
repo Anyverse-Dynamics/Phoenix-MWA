@@ -40,6 +40,7 @@ Available and planned releases include:
 
 | Model | Weights | Benchmark Performance |
 | --- | --- | --- |
+| Joint96 Pretrain (step 256013) | [Hugging Face](https://huggingface.co/OpenPhoenix/Phoenix-Pretrain) | — |
 | Encoder & VAE | [Hugging Face](https://huggingface.co/OpenPhoenix/Phoenix-Encoders) | — |
 | LIBERO (Preview) | [Hugging Face](https://huggingface.co/OpenPhoenix/Phoenix-LIBERO) | 94.63% (LIBERO-Plus); 66.48% (LIBERO-Pro) |
 | RoboCasa GR1 (Preview) | [Hugging Face](https://huggingface.co/OpenPhoenix/Phoenix-RoboCasa) | 82.67% |
@@ -88,13 +89,21 @@ host graphics driver. See [system prerequisites and pinned dependencies](docs/IN
 See [resource acquisition](docs/RESOURCES.md) for official benchmark sources,
 directory layouts and the distinction between available resources and pending releases.
 
+Pretrain weight (Joint96, step 256013): [Hugging Face](https://huggingface.co/OpenPhoenix/Phoenix-Pretrain/resolve/main/pretrain_256013.pt) · [HF mirror](https://huggingface.co/AnyverseDynamics/Phoenix-Pretrain/resolve/main/pretrain_256013.pt) · [ModelScope](https://www.modelscope.cn/api/v1/models/ssuuuuu/phoenix-wam/repo?Revision=master&FilePath=phoenix-mwa-pretrain-joint96-step_256013.pt).
 
-Pretrain weight: [Phoenix-MWA Joint96 (step 256013)](https://www.modelscope.cn/api/v1/models/ssuuuuu/phoenix-wam/repo?Revision=master&FilePath=phoenix-mwa-pretrain-joint96-step_256013.pt)
+For post-training, download the checkpoint and set its path before sourcing
+the machine configuration or running a training launcher:
 
+```bash
+hf download OpenPhoenix/Phoenix-Pretrain pretrain_256013.pt \
+  --local-dir resources/pretrain
+export WAM_PRETRAIN_CHECKPOINT="$PWD/resources/pretrain/pretrain_256013.pt"
+```
 
 | Relative location | Contents |
 | --- | --- |
 | `checkpoints/` | Wan components, policy and initialization weights |
+| `resources/pretrain/pretrain_256013.pt` | Joint96 pretrained video/action weights for post-training initialization |
 | `resources/encoders/` | Shared `dino110k.pt` and `csvae.pt` encoder weights |
 | `data/libero_mujoco3.3.2/` | FastWAM's four preprocessed LIBERO LeRobot v2.1 suites |
 | `data/robocasa/` | RoboCasa GR1 LeRobot episodes |
