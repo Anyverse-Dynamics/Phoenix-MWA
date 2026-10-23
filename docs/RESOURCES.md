@@ -8,12 +8,11 @@ weights, datasets and simulator assets are separate releases.
 ## Pretraining checkpoint
 
 The Robot37 Joint96 checkpoint at step 256013 is available from
-[OpenPhoenix/Phoenix-Pretrain](https://huggingface.co/OpenPhoenix/Phoenix-Pretrain)
-and its [AnyverseDynamics mirror](https://huggingface.co/AnyverseDynamics/Phoenix-Pretrain).
+[AnyverseDynamics/Phoenix-Pretrain](https://huggingface.co/AnyverseDynamics/Phoenix-Pretrain).
 Download it and set the initialization path before sourcing a machine example:
 
 ```bash
-hf download OpenPhoenix/Phoenix-Pretrain pretrain_256013.pt \
+hf download AnyverseDynamics/Phoenix-Pretrain pretrain_256013.pt \
   --local-dir resources/pretrain
 export WAM_PRETRAIN_CHECKPOINT="$PWD/resources/pretrain/pretrain_256013.pt"
 ```
@@ -49,7 +48,7 @@ The shared encoder filenames are `dino110k.pt` and `csvae.pt`. Download them to
 the paths used by all three inference configurations:
 
 ```bash
-hf download OpenPhoenix/Phoenix-Encoders dino110k.pt csvae.pt \
+hf download AnyverseDynamics/Phoenix-Encoders dino110k.pt csvae.pt \
   --local-dir resources/encoders
 ```
 
@@ -350,7 +349,7 @@ See [exact simulator and assets](ROBOTWIN.md#exact-simulator-and-assets) for pin
 download commands and the local patches preserved from the evaluation snapshot.
 Minimal project-hosted release files are `policy.pt`, both frozen archives and
 their manifest; the inference config and normalization belong in source, and
-the two encoders are reused from `OpenPhoenix/Phoenix-Encoders`. The frozen
+the two encoders are reused from `AnyverseDynamics/Phoenix-Encoders`. The frozen
 archives can instead be hosted in a separate HF dataset, but cannot be omitted
 from reproduction of this protocol. Obtain access to both archives before
 launching evaluation.

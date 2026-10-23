@@ -15,7 +15,7 @@
 
 <p align="center">
   <a href="https://openphoenix-team.github.io/Phoenix-pages/"><img src="https://img.shields.io/badge/Project%20Page-Blog post-blue?style=flat&amp;logo=github" alt="Project Page"></a>
-  <a href="https://huggingface.co/collections/OpenPhoenix/phoenix-mwa"><img src="https://img.shields.io/badge/HuggingFace-Model%20%26%20Data-orange?style=flat&amp;logo=huggingface" alt="Model &amp; Data on Hugging Face"></a>
+  <a href="https://huggingface.co/AnyverseDynamics"><img src="https://img.shields.io/badge/HuggingFace-Model%20%26%20Data-orange?style=flat&amp;logo=huggingface" alt="Model &amp; Data on Hugging Face"></a>
 </p>
 
 <p align="center">
@@ -40,11 +40,11 @@ Available and planned releases include:
 
 | Model | Weights | Benchmark Performance |
 | --- | --- | --- |
-| Joint96 Pretrain (step 256013) | [Hugging Face](https://huggingface.co/OpenPhoenix/Phoenix-Pretrain) | — |
-| Encoder & VAE | [Hugging Face](https://huggingface.co/OpenPhoenix/Phoenix-Encoders) | — |
-| LIBERO (Preview) | [Hugging Face](https://huggingface.co/OpenPhoenix/Phoenix-LIBERO) | 94.63% (LIBERO-Plus); 66.48% (LIBERO-Pro) |
-| RoboCasa GR1 (Preview) | [Hugging Face](https://huggingface.co/OpenPhoenix/Phoenix-RoboCasa) | 82.67% |
-| RoboTwin 2.0 (Preview) | [Hugging Face](https://huggingface.co/OpenPhoenix/Phoenix-RoboTwin) | 86.54% (Clean2Clean); 72.42% (Clean2Random) |
+| Joint96 Pretrain (step 256013) | [Hugging Face](https://huggingface.co/AnyverseDynamics/Phoenix-Pretrain) | — |
+| Encoder & VAE | [Hugging Face](https://huggingface.co/AnyverseDynamics/Phoenix-Encoders) | — |
+| LIBERO (Preview) | [Hugging Face](https://huggingface.co/AnyverseDynamics/Phoenix-LIBERO) | 94.63% (LIBERO-Plus); 66.48% (LIBERO-Pro) |
+| RoboCasa GR1 (Preview) | [Hugging Face](https://huggingface.co/AnyverseDynamics/Phoenix-RoboCasa) | 82.67% |
+| RoboTwin 2.0 (Preview) | [Hugging Face](https://huggingface.co/AnyverseDynamics/Phoenix-RoboTwin) | 86.54% (Clean2Clean); 72.42% (Clean2Random) |
 | RoboDojo-Sim (Preview) | Coming soon... 🏗️ 🚧 🔨 | — |
 | RoboDojo-RealWorld (Preview) | Coming soon... 🏗️ 🚧 🔨 | — |
 | Bench2Dex (Preview) | Coming soon... 🏗️ 🚧 🔨 | — |
@@ -89,13 +89,13 @@ host graphics driver. See [system prerequisites and pinned dependencies](docs/IN
 See [resource acquisition](docs/RESOURCES.md) for official benchmark sources,
 directory layouts and the distinction between available resources and pending releases.
 
-Pretrain weight (Joint96, step 256013): [Hugging Face](https://huggingface.co/OpenPhoenix/Phoenix-Pretrain/resolve/main/pretrain_256013.pt) · [HF mirror](https://huggingface.co/AnyverseDynamics/Phoenix-Pretrain/resolve/main/pretrain_256013.pt) · [ModelScope](https://www.modelscope.cn/api/v1/models/ssuuuuu/phoenix-wam/repo?Revision=master&FilePath=phoenix-mwa-pretrain-joint96-step_256013.pt).
+Pretrain weight (Joint96, step 256013): [Hugging Face](https://huggingface.co/AnyverseDynamics/Phoenix-Pretrain/resolve/main/pretrain_256013.pt) · [ModelScope](https://www.modelscope.cn/api/v1/models/ssuuuuu/phoenix-wam/repo?Revision=master&FilePath=phoenix-mwa-pretrain-joint96-step_256013.pt).
 
 For post-training, download the checkpoint and set its path before sourcing
 the machine configuration or running a training launcher:
 
 ```bash
-hf download OpenPhoenix/Phoenix-Pretrain pretrain_256013.pt \
+hf download AnyverseDynamics/Phoenix-Pretrain pretrain_256013.pt \
   --local-dir resources/pretrain
 export WAM_PRETRAIN_CHECKPOINT="$PWD/resources/pretrain/pretrain_256013.pt"
 ```
@@ -286,8 +286,8 @@ the download commands below.
 
 | Mode | Required archive | Download |
 | --- | --- | --- |
-| C2C | `phoenix_robotwin_c2c_frozen_v1.tar.gz` | [Phoenix-RoboTwin](https://huggingface.co/OpenPhoenix/Phoenix-RoboTwin) |
-| C2R | `phoenix_robotwin_c2r_frozen_v1.tar.gz` | [Phoenix-RoboTwin](https://huggingface.co/OpenPhoenix/Phoenix-RoboTwin) |
+| C2C | `phoenix_robotwin_c2c_frozen_v1.tar.gz` | [Phoenix-RoboTwin](https://huggingface.co/AnyverseDynamics/Phoenix-RoboTwin) |
+| C2R | `phoenix_robotwin_c2r_frozen_v1.tar.gz` | [Phoenix-RoboTwin](https://huggingface.co/AnyverseDynamics/Phoenix-RoboTwin) |
 
 From the repository root, download both archives and extract their `c2c/` and
 `c2r/` directories:
@@ -298,7 +298,7 @@ mkdir -p resources/robotwin/frozen
 for mode in c2c c2r; do
   archive="phoenix_robotwin_${mode}_frozen_v1.tar.gz"
   curl --fail --location --retry 3 \
-    "https://huggingface.co/OpenPhoenix/Phoenix-RoboTwin/resolve/main/${archive}" \
+    "https://huggingface.co/AnyverseDynamics/Phoenix-RoboTwin/resolve/main/${archive}" \
     --output "resources/robotwin/frozen/${archive}"
   tar -xzf "resources/robotwin/frozen/${archive}" -C resources/robotwin/frozen
 done

@@ -22,8 +22,8 @@ in source; only their weights are separate downloads.
 
 | Location | Required release content |
 | --- | --- |
-| `OpenPhoenix/Phoenix-RoboTwin` | `policy.pt`, the two frozen archives below and `MANIFEST.json` |
-| `OpenPhoenix/Phoenix-Encoders` | Shared `dino110k.pt`, `csvae.pt` |
+| `AnyverseDynamics/Phoenix-RoboTwin` | `policy.pt`, the two frozen archives below and `MANIFEST.json` |
+| `AnyverseDynamics/Phoenix-Encoders` | Shared `dino110k.pt`, `csvae.pt` |
 | This source checkout | Inference YAML, normalization, simulator patches/version manifest, evaluator |
 | Pinned upstream downloads | Simulator, CuRobo, robot/object/texture assets, WanVAE, T5 and tokenizer |
 
@@ -33,8 +33,8 @@ the download commands. Weights alone cannot reproduce this frozen protocol.
 Once the policy repository is accessible, download into the expected layout:
 
 ```bash
-hf download OpenPhoenix/Phoenix-RoboTwin policy.pt --local-dir checkpoints/robotwin
-hf download OpenPhoenix/Phoenix-Encoders dino110k.pt csvae.pt \
+hf download AnyverseDynamics/Phoenix-RoboTwin policy.pt --local-dir checkpoints/robotwin
+hf download AnyverseDynamics/Phoenix-Encoders dino110k.pt csvae.pt \
   --local-dir resources/encoders
 ```
 
@@ -134,8 +134,8 @@ replace these inputs. The launcher does not download or regenerate them.
 
 | Mode | Required archive | Download |
 | --- | --- | --- |
-| C2C | `phoenix_robotwin_c2c_frozen_v1.tar.gz` | [Phoenix-RoboTwin](https://huggingface.co/OpenPhoenix/Phoenix-RoboTwin) |
-| C2R | `phoenix_robotwin_c2r_frozen_v1.tar.gz` | [Phoenix-RoboTwin](https://huggingface.co/OpenPhoenix/Phoenix-RoboTwin) |
+| C2C | `phoenix_robotwin_c2c_frozen_v1.tar.gz` | [Phoenix-RoboTwin](https://huggingface.co/AnyverseDynamics/Phoenix-RoboTwin) |
+| C2R | `phoenix_robotwin_c2r_frozen_v1.tar.gz` | [Phoenix-RoboTwin](https://huggingface.co/AnyverseDynamics/Phoenix-RoboTwin) |
 
 The release layout places both archives and `MANIFEST.json` at the HF repository
 root; a model-card README is not a runtime dependency. Availability must be
@@ -147,7 +147,7 @@ mkdir -p resources/robotwin/frozen
 for file in phoenix_robotwin_c2c_frozen_v1.tar.gz \
             phoenix_robotwin_c2r_frozen_v1.tar.gz MANIFEST.json; do
   curl --fail --location --retry 3 \
-    "https://huggingface.co/OpenPhoenix/Phoenix-RoboTwin/resolve/main/${file}" \
+    "https://huggingface.co/AnyverseDynamics/Phoenix-RoboTwin/resolve/main/${file}" \
     --output "resources/robotwin/frozen/${file}"
 done
 tar -xzf resources/robotwin/frozen/phoenix_robotwin_c2c_frozen_v1.tar.gz \
