@@ -1,3 +1,12 @@
+Phoenix-MWA licensing notice
+
+As of 2026-10-28, project-original source code and documentation are
+available under the MIT License in LICENSE, including commercial use.
+Existing copyright notices and earlier license grants are preserved.
+Third-party components retain their own licenses; the project MIT grant
+does not relicense them. External weights, datasets, robot assets and
+trademarks remain subject to their respective terms.
+
 Phoenix-MWA includes adapted third-party code:
 
 - Hugging Face LeRobot: src/wam/datasets/lerobot/lerobot/, under the
@@ -29,3 +38,18 @@ Encoder pretraining integration:
   in src/wam/third_party/dino_runtime/STARVLA-LICENSE.
   VGGT-Ω and V-JEPA teacher sources and pretrained weights are external resources
   and retain their respective upstream licenses.
+
+Additional bundled-component notices
+------------------------------------
+
+- Original LIBERO code within third_party/LIBERO-plus/: retain the MIT
+  copyright and permission notice in LICENSES/LIBERO-MIT.txt.
+  https://github.com/Lifelong-Robot-Learning/LIBERO
+  LIBERO-Plus-specific modifications are separate upstream material; this
+  project does not grant an MIT license for those modifications. Their
+  redistribution terms must be confirmed with https://github.com/sylvestf/LIBERO-plus.
+- msgpack-numpy-derived serialization code in
+  third_party/robocasa_runner/deployment/model_server/tools/msgpack_numpy.py:
+  retain the BSD-3-Clause terms and Lev E. Givon copyright in
+  LICENSES/msgpack-numpy-BSD-3-Clause.md.
+  https://github.com/lebedov/msgpack-numpy
