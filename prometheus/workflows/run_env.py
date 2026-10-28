@@ -15,9 +15,20 @@ from hydra.utils import to_absolute_path
 from omegaconf import DictConfig
 
 from prometheus.core.action import ActionTrace
-from prometheus.core.metadata import KIND_SENSOR_IMAGE, META_FIELD, META_KIND, META_SENSOR, META_STREAM_NAME
+from prometheus.core.metadata import (
+    KIND_SENSOR_IMAGE,
+    META_FIELD,
+    META_KIND,
+    META_SENSOR,
+    META_STREAM_NAME,
+)
 from prometheus.core.sample import StreamSample
-from prometheus.hardware import RobotStatePublisher, RosIngest, RosTopicSpec, robot_observation_topic_specs
+from prometheus.hardware import (
+    RobotStatePublisher,
+    RosIngest,
+    RosTopicSpec,
+    robot_observation_topic_specs,
+)
 from prometheus.recording import (
     EefTraceCapture,
     EpisodeCapture,
@@ -26,7 +37,11 @@ from prometheus.recording import (
     tactile_fields_by_sensor,
 )
 from prometheus.runtime import ActionScheduler, ObsStore, replace_pending
-from prometheus.runtime.preview import FfplayImagePreview, FfplayMosaicPreview, RosMosaicPreviewProcess
+from prometheus.runtime.preview import (
+    FfplayImagePreview,
+    FfplayMosaicPreview,
+    RosMosaicPreviewProcess,
+)
 from prometheus.transport.zmq_env import ZmqEnvServer
 from prometheus.workflows.common import (
     StreamReadiness,
@@ -167,7 +182,10 @@ class KeyboardTerminalInput:
 
         self._listener = keyboard.Listener(on_press=self._on_press)
         self._listener.start()
-        print("[run_env] keyboard: s=save episode, q=abort episode, Ctrl-C=shutdown", flush=True)
+        print(
+            "[run_env] keyboard: s=save episode, q=abort episode, Ctrl-C=shutdown",
+            flush=True,
+        )
 
     def close(self) -> None:
         if self._listener is not None:
@@ -195,9 +213,13 @@ def reset_runtime_options(options: Any | None) -> ResetRuntimeOptions:
         recording_enabled=bool(data.get("recording_enabled", True)),
         eef_trace_enabled=bool(data.get("eef_trace_enabled", True)),
         recording_root=optional_reset_text(data.get("recording_root")),
-        recording_episode_prefix=optional_reset_text(data.get("recording_episode_prefix")),
+        recording_episode_prefix=optional_reset_text(
+            data.get("recording_episode_prefix")
+        ),
         eef_trace_root=optional_reset_text(data.get("eef_trace_root")),
-        eef_trace_episode_prefix=optional_reset_text(data.get("eef_trace_episode_prefix")),
+        eef_trace_episode_prefix=optional_reset_text(
+            data.get("eef_trace_episode_prefix")
+        ),
     )
 
 
@@ -284,9 +306,13 @@ class RunEnvSession:
         fixed_chunk_switch: bool = False,
         dry_run: bool = False,
         action_log_interval: int = 0,
-        recorder_factory: Callable[[ResetRuntimeOptions], EpisodeCapture | None] | None = None,
+        recorder_factory: (
+            Callable[[ResetRuntimeOptions], EpisodeCapture | None] | None
+        ) = None,
         recorder_slot: ActiveRecorderSlot | None = None,
-        eef_trace_factory: Callable[[ResetRuntimeOptions], EefTraceCapture | None] | None = None,
+        eef_trace_factory: (
+            Callable[[ResetRuntimeOptions], EefTraceCapture | None] | None
+        ) = None,
         eef_trace_slot: ActiveEefTraceSlot | None = None,
     ):
         self.robot = robot
@@ -314,7 +340,9 @@ class RunEnvSession:
         self._terminal_lock = threading.Lock()
         self._terminal: TerminalRequest | None = None
 
-    def reset(self, *, obs_keys: Sequence[str], options: Any | None = None) -> dict[str, Any]:
+    def reset(
+        self, *, obs_keys: Sequence[str], options: Any | None = None
+    ) -> dict[str, Any]:
         if self._started:
             raise RuntimeError("run_env session is already reset")
         self._consume_terminal()
@@ -384,8 +412,10 @@ class RunEnvSession:
         self._started = True
         return {
             "obs": obs,
-            "info": {"available_obs": self.obs_store.available(),
-                     "sent_action_count": self.scheduler.sent_action_count},
+            "info": {
+                "available_obs": self.obs_store.available(),
+                "sent_action_count": self.scheduler.sent_action_count,
+            },
         }
 
     def observe(self, *, obs_keys: Sequence[str]) -> dict[str, Any]:
@@ -403,7 +433,9 @@ class RunEnvSession:
     def request_terminal(self, *, accept: bool, reason: str) -> None:
         with self._terminal_lock:
             if self._terminal is None:
-                self._terminal = TerminalRequest(accept=bool(accept), reason=str(reason))
+                self._terminal = TerminalRequest(
+                    accept=bool(accept), reason=str(reason)
+                )
         self.prepare_terminal()
 
     def prepare_terminal(self) -> None:
@@ -421,7 +453,9 @@ class RunEnvSession:
         if terminal is not None:
             return self._close_with_terminal(keys, terminal, info={})
         scheduler_start = time.monotonic()
-        info: dict[str, Any] = dict(self.scheduler.submit_and_wait(actions, timeout_s=self.step_timeout_s))
+        info: dict[str, Any] = dict(
+            self.scheduler.submit_and_wait(actions, timeout_s=self.step_timeout_s)
+        )
         info["scheduler_wait_ms"] = (time.monotonic() - scheduler_start) * 1000.0
         terminal = self._consume_terminal()
         if terminal is not None:
@@ -471,7 +505,9 @@ class RunEnvSession:
         }
         self.close(
             accept=terminal.accept,
-            discard=(not terminal.accept and terminal.reason in DISCARD_TERMINAL_REASONS),
+            discard=(
+                not terminal.accept and terminal.reason in DISCARD_TERMINAL_REASONS
+            ),
         )
         return payload
 
@@ -530,7 +566,9 @@ class RunEnvSession:
                     if discard
                     else ("saved" if accept and error is None else "rejected")
                 )
-                print(f"[run_env] eef trace {status} {eef_trace.episode_id}", flush=True)
+                print(
+                    f"[run_env] eef trace {status} {eef_trace.episode_id}", flush=True
+                )
         except BaseException as exc:
             if error is None:
                 error = exc
@@ -561,7 +599,9 @@ def serve_forever(
                     health_check()
                 if request_type == "reset":
                     if session is not None:
-                        raise RuntimeError("client is already attached; call close before reset")
+                        raise RuntimeError(
+                            "client is already attached; call close before reset"
+                        )
                     new_session = session_factory()
                     try:
                         payload = new_session.reset(
@@ -578,7 +618,10 @@ def serve_forever(
                 elif request_type == "step":
                     if session is None:
                         raise RuntimeError("no attached client; call reset first")
-                    payload = session.step(request.get("actions"), obs_keys=tuple(request.get("obs_keys", ())))
+                    payload = session.step(
+                        request.get("actions"),
+                        obs_keys=tuple(request.get("obs_keys", ())),
+                    )
                     closed = session.closed
                     server.reply(request_id, **payload)
                     if closed:
@@ -589,7 +632,9 @@ def serve_forever(
                     # A pre-reset observe is intentionally read-only: constructing a
                     # session does not start robot control or the action scheduler.
                     reader = session if session is not None else session_factory()
-                    payload = reader.observe(obs_keys=tuple(request.get("obs_keys", ())))
+                    payload = reader.observe(
+                        obs_keys=tuple(request.get("obs_keys", ()))
+                    )
                     server.reply(request_id, **payload)
                 elif request_type == "prepare_terminal":
                     reason = str(request.get("reason", "client_prepare_terminal"))
@@ -609,7 +654,9 @@ def serve_forever(
                     reason = str(request.get("reason", "client_terminal"))
                     episode_metadata = rollout_outcome_metadata(request.get("outcome"))
                     if episode_metadata and not accept:
-                        raise ValueError("terminal outcome is only valid for an accepted episode")
+                        raise ValueError(
+                            "terminal outcome is only valid for an accepted episode"
+                        )
                     discard = not accept and (
                         bool(request.get("discard", False))
                         or reason in DISCARD_TERMINAL_REASONS
@@ -656,7 +703,9 @@ def serve_forever(
                             session_slot.detach(session)
                         session.close(accept=accept)
                         session = None
-                    server.reply(request_id, info={"shutdown": True, "terminal_reason": reason})
+                    server.reply(
+                        request_id, info={"shutdown": True, "terminal_reason": reason}
+                    )
                     return
                 else:
                     raise ValueError(f"unknown run_env request type {request_type!r}")
@@ -669,7 +718,9 @@ def serve_forever(
             session.close(accept=False)
 
 
-def compose_trace_hooks(hooks: Sequence[Callable[[ActionTrace], None]]) -> Callable[[ActionTrace], None] | None:
+def compose_trace_hooks(
+    hooks: Sequence[Callable[[ActionTrace], None]],
+) -> Callable[[ActionTrace], None] | None:
     callbacks = tuple(hooks)
     if not callbacks:
         return None
@@ -706,9 +757,13 @@ def rewrite_exposure_cli_args(args: Sequence[str]) -> list[str]:
     selectors = [arg for arg in args if arg in EXPOSURE_CLI_OVERRIDES]
     explicit = [arg for arg in args if arg.startswith("realsense.exposure_mode=")]
     if len(selectors) > 1:
-        raise SystemExit("choose exactly one exposure selector: auto-exposure or fix-exposure")
+        raise SystemExit(
+            "choose exactly one exposure selector: auto-exposure or fix-exposure"
+        )
     if selectors and explicit:
-        raise SystemExit("do not combine an exposure selector with realsense.exposure_mode=...")
+        raise SystemExit(
+            "do not combine an exposure selector with realsense.exposure_mode=..."
+        )
     return [EXPOSURE_CLI_OVERRIDES.get(arg, arg) for arg in args]
 
 
@@ -722,7 +777,11 @@ def rewrite_preview_cli_args(args: Sequence[str]) -> list[str]:
         raise SystemExit("specify at most one preview selector")
     if selectors and explicit_enabled:
         raise SystemExit("do not combine head-preview with preview.enabled=...")
-    if selectors and selectors[0] in {"sensor-preview", "--sensor-preview"} and explicit_mode:
+    if (
+        selectors
+        and selectors[0] in {"sensor-preview", "--sensor-preview"}
+        and explicit_mode
+    ):
         raise SystemExit("do not combine sensor-preview with preview.mode=...")
     rewritten: list[str] = []
     for arg in args:
@@ -743,7 +802,9 @@ def run(cfg: DictConfig) -> None:
     env_cfg = cfg.env
     robot = LockedRobot(instantiate(cfg.robot.sdk, _convert_="all"))
     action_rewriter = instantiate(env_cfg.action_rewriter)
-    realsense = instantiate_optional_node(cfg.realsense, ros_domain_id=env_cfg.ros_domain_id)
+    realsense = instantiate_optional_node(
+        cfg.realsense, ros_domain_id=env_cfg.ros_domain_id
+    )
     xense = instantiate_optional_node(cfg.xense, ros_domain_id=env_cfg.ros_domain_id)
     publishers = [node for node in (realsense, xense) if node is not None]
 
@@ -757,20 +818,30 @@ def run(cfg: DictConfig) -> None:
         hz=float(robot.control_hz),
         qos_depth=int(env_cfg.qos_depth),
     )
-    robot_topics = list(robot_observation_topic_specs(state_topic=state_topic, pose_topics=pose_topics))
+    robot_topics = list(
+        robot_observation_topic_specs(state_topic=state_topic, pose_topics=pose_topics)
+    )
     topics = list(robot_topics)
     for publisher in publishers:
         topics.extend(publisher.ros_topic_specs())
     tactile_fields = tactile_fields_by_sensor(publishers)
     camera_streams = camera_streams_from_topics(topics, tactile_fields)
-    preview_camera_topics, preview_tactile_image_topics = sensor_preview_topic_maps(topics, tactile_fields)
+    preview_camera_topics, preview_tactile_image_topics = sensor_preview_topic_maps(
+        topics, tactile_fields
+    )
     readiness = StreamReadiness(required_stream_names(topics))
 
     obs_store = ObsStore(history=int(env_cfg.obs_history))
     recording_cfg = getattr(cfg, "recording", None)
     recording_enabled = bool(recording_cfg is not None and recording_cfg.enabled)
-    tactile_media_fps = float(getattr(cfg.xense, "hz", recording_cfg.media_fps)) if recording_enabled else 0.0
-    tactile_field_sets = {sensor: set(fields) for sensor, fields in tactile_fields.items()}
+    tactile_media_fps = (
+        float(getattr(cfg.xense, "hz", recording_cfg.media_fps))
+        if recording_enabled
+        else 0.0
+    )
+    tactile_field_sets = {
+        sensor: set(fields) for sensor, fields in tactile_fields.items()
+    }
     tactile_media_fps_by_stream: dict[str, float] = {}
     if recording_enabled:
         for topic in topics:
@@ -795,7 +866,9 @@ def run(cfg: DictConfig) -> None:
         enabled=bool(False if keyboard_cfg is None else keyboard_cfg.enabled),
     )
     preview_cfg = getattr(cfg, "preview", None)
-    preview_mode = str("single" if preview_cfg is None else getattr(preview_cfg, "mode", "single")).lower()
+    preview_mode = str(
+        "single" if preview_cfg is None else getattr(preview_cfg, "mode", "single")
+    ).lower()
     if preview_mode == "mosaic":
         preview = FfplayMosaicPreview(
             enabled=bool(preview_cfg.enabled),
@@ -808,18 +881,36 @@ def run(cfg: DictConfig) -> None:
             window_title=str(preview_cfg.window_title),
         )
     elif preview_mode == "ros_mosaic":
-        window_title = str("Prometheus sensor preview" if preview_cfg is None else preview_cfg.window_title)
+        window_title = str(
+            "Prometheus sensor preview"
+            if preview_cfg is None
+            else preview_cfg.window_title
+        )
         if window_title == "Prometheus head camera":
             window_title = "Prometheus sensor preview"
-        preview_python = None if preview_cfg is None else optional_text(getattr(preview_cfg, "python_executable", None))
+        preview_python = (
+            None
+            if preview_cfg is None
+            else optional_text(getattr(preview_cfg, "python_executable", None))
+        )
         preview = RosMosaicPreviewProcess(
             enabled=bool(False if preview_cfg is None else preview_cfg.enabled),
             camera_topics=preview_camera_topics,
             tactile_image_topics=preview_tactile_image_topics,
-            fps=float(20.0 if preview_cfg is None else getattr(preview_cfg, "fps", 20.0)),
-            width=int(1280 if preview_cfg is None else getattr(preview_cfg, "width", 1280)),
-            height=int(720 if preview_cfg is None else getattr(preview_cfg, "height", 720)),
-            stale_timeout_s=float(1.0 if preview_cfg is None else getattr(preview_cfg, "stale_timeout_s", 1.0)),
+            fps=float(
+                20.0 if preview_cfg is None else getattr(preview_cfg, "fps", 20.0)
+            ),
+            width=int(
+                1280 if preview_cfg is None else getattr(preview_cfg, "width", 1280)
+            ),
+            height=int(
+                720 if preview_cfg is None else getattr(preview_cfg, "height", 720)
+            ),
+            stale_timeout_s=float(
+                1.0
+                if preview_cfg is None
+                else getattr(preview_cfg, "stale_timeout_s", 1.0)
+            ),
             window_title=window_title,
             ros_domain_id=int(env_cfg.ros_domain_id),
             python_executable=preview_python,
@@ -827,10 +918,16 @@ def run(cfg: DictConfig) -> None:
     elif preview_mode == "single":
         preview = FfplayImagePreview(
             enabled=bool(False if preview_cfg is None else preview_cfg.enabled),
-            stream_key=str("base_0_rgb" if preview_cfg is None else preview_cfg.stream_key),
+            stream_key=str(
+                "base_0_rgb" if preview_cfg is None else preview_cfg.stream_key
+            ),
             fps=float(30.0 if preview_cfg is None else preview_cfg.fps),
             ffplay=str("ffplay" if preview_cfg is None else preview_cfg.ffplay),
-            window_title=str("Prometheus head camera" if preview_cfg is None else preview_cfg.window_title),
+            window_title=str(
+                "Prometheus head camera"
+                if preview_cfg is None
+                else preview_cfg.window_title
+            ),
         )
     else:
         raise ValueError(f"unknown preview mode: {preview_mode!r}")
@@ -858,11 +955,15 @@ def run(cfg: DictConfig) -> None:
                 raise_if_error()
 
     def make_session() -> RunEnvSession:
-        def make_recorder(runtime_options: ResetRuntimeOptions) -> EpisodeCapture | None:
+        def make_recorder(
+            runtime_options: ResetRuntimeOptions,
+        ) -> EpisodeCapture | None:
             if not recording_enabled:
                 return None
             recording_root = runtime_options.recording_root or str(recording_cfg.root)
-            recording_episode_prefix = runtime_options.recording_episode_prefix or str(recording_cfg.episode_prefix)
+            recording_episode_prefix = runtime_options.recording_episode_prefix or str(
+                recording_cfg.episode_prefix
+            )
             return EpisodeCapture(
                 root=resolve_reset_path(recording_root),
                 episode_prefix=recording_episode_prefix,
@@ -877,7 +978,9 @@ def run(cfg: DictConfig) -> None:
                 video_codec=str(getattr(recording_cfg, "video_codec", "libx264")),
                 video_crf=int(getattr(recording_cfg, "video_crf", 14)),
                 video_preset=str(getattr(recording_cfg, "video_preset", "veryfast")),
-                write_visualizations=bool(getattr(recording_cfg, "write_visualizations", True)),
+                write_visualizations=bool(
+                    getattr(recording_cfg, "write_visualizations", True)
+                ),
                 visualization_dpi=int(getattr(recording_cfg, "visualization_dpi", 220)),
                 media_fps_by_stream=tactile_media_fps_by_stream,
                 metadata={
@@ -889,11 +992,15 @@ def run(cfg: DictConfig) -> None:
                 workflow="run_env",
             )
 
-        def make_eef_trace(runtime_options: ResetRuntimeOptions) -> EefTraceCapture | None:
+        def make_eef_trace(
+            runtime_options: ResetRuntimeOptions,
+        ) -> EefTraceCapture | None:
             if not eef_trace_enabled:
                 return None
             eef_trace_root = runtime_options.eef_trace_root or str(eef_trace_cfg.root)
-            eef_trace_episode_prefix = runtime_options.eef_trace_episode_prefix or str(eef_trace_cfg.episode_prefix)
+            eef_trace_episode_prefix = runtime_options.eef_trace_episode_prefix or str(
+                eef_trace_cfg.episode_prefix
+            )
             return EefTraceCapture(
                 root=resolve_reset_path(eef_trace_root),
                 episode_prefix=eef_trace_episode_prefix,
@@ -937,10 +1044,17 @@ def run(cfg: DictConfig) -> None:
                 wait_ready(float(env_cfg.wait_ready_timeout_s))
         keyboard.start()
         readiness.wait(timeout_s=float(env_cfg.wait_ready_timeout_s))
-        obs_store.latest(tuple(env_cfg.ready_obs_keys), timeout_s=float(env_cfg.reset_timeout_s))
+        obs_store.latest(
+            tuple(env_cfg.ready_obs_keys), timeout_s=float(env_cfg.reset_timeout_s)
+        )
         print(f"[run_env] serving {env_cfg.addr}", flush=True)
         with ZmqEnvServer(addr=str(env_cfg.addr)) as server:
-            serve_forever(server, make_session, session_slot=session_slot, health_check=check_publishers)
+            serve_forever(
+                server,
+                make_session,
+                session_slot=session_slot,
+                health_check=check_publishers,
+            )
     except KeyboardInterrupt:
         print("[run_env] interrupted", flush=True)
     finally:
@@ -954,8 +1068,12 @@ def run(cfg: DictConfig) -> None:
             robot.close()
 
 
-def select_obs_keys(obs_keys: Sequence[str], *, default_obs_keys: Sequence[str]) -> tuple[str, ...]:
-    keys = tuple(str(key) for key in obs_keys) or tuple(str(key) for key in default_obs_keys)
+def select_obs_keys(
+    obs_keys: Sequence[str], *, default_obs_keys: Sequence[str]
+) -> tuple[str, ...]:
+    keys = tuple(str(key) for key in obs_keys) or tuple(
+        str(key) for key in default_obs_keys
+    )
     if not keys:
         raise ValueError("obs_keys is empty and env.default_obs_keys is empty")
     return keys
@@ -1024,28 +1142,51 @@ def validate_reset_options(
     data.pop("eef_trace_episode_prefix", None)
     if data:
         raise ValueError(f"unsupported reset options: {sorted(data)}")
-    supported = {"fixed_chunk_switch", "action_space", "action_dim", "action_hz", "policy_low_watermark", "action_chunk_horizon"}
+    supported = {
+        "fixed_chunk_switch",
+        "action_space",
+        "action_dim",
+        "action_hz",
+        "policy_low_watermark",
+        "action_chunk_horizon",
+    }
     unknown = set(expect).difference(supported)
     if unknown:
         raise ValueError(f"unsupported reset expect keys: {sorted(unknown)}")
 
     if "action_space" in expect and str(expect["action_space"]) != str(action_space):
-        raise ValueError(f"action_space mismatch: expected {expect['action_space']!r}, server has {action_space!r}")
+        raise ValueError(
+            f"action_space mismatch: expected {expect['action_space']!r}, server has {action_space!r}"
+        )
     if "action_dim" in expect and int(expect["action_dim"]) != int(action_dim):
-        raise ValueError(f"action_dim mismatch: expected {int(expect['action_dim'])}, server has {int(action_dim)}")
-    if "action_hz" in expect and not float_equal(float(expect["action_hz"]), float(action_hz)):
-        raise ValueError(f"action_hz mismatch: expected {float(expect['action_hz'])}, server has {float(action_hz)}")
-    if "policy_low_watermark" in expect and int(expect["policy_low_watermark"]) != int(policy_low_watermark):
+        raise ValueError(
+            f"action_dim mismatch: expected {int(expect['action_dim'])}, server has {int(action_dim)}"
+        )
+    if "action_hz" in expect and not float_equal(
+        float(expect["action_hz"]), float(action_hz)
+    ):
+        raise ValueError(
+            f"action_hz mismatch: expected {float(expect['action_hz'])}, server has {float(action_hz)}"
+        )
+    if "policy_low_watermark" in expect and int(expect["policy_low_watermark"]) != int(
+        policy_low_watermark
+    ):
         raise ValueError(
             "policy_low_watermark mismatch: "
             f"expected {int(expect['policy_low_watermark'])}, server has {int(policy_low_watermark)}"
         )
-    if "fixed_chunk_switch" in expect and expect["fixed_chunk_switch"] != bool(fixed_chunk_switch):
-        raise ValueError(f"fixed_chunk_switch mismatch: expected {expect['fixed_chunk_switch']}, server has {fixed_chunk_switch}")
+    if "fixed_chunk_switch" in expect and expect["fixed_chunk_switch"] != bool(
+        fixed_chunk_switch
+    ):
+        raise ValueError(
+            f"fixed_chunk_switch mismatch: expected {expect['fixed_chunk_switch']}, server has {fixed_chunk_switch}"
+        )
     if "action_chunk_horizon" in expect:
         horizon = int(expect["action_chunk_horizon"])
         if not 1 <= horizon <= int(max_chunk_horizon):
-            raise ValueError(f"action_chunk_horizon must be in [1,{int(max_chunk_horizon)}], got {horizon}")
+            raise ValueError(
+                f"action_chunk_horizon must be in [1,{int(max_chunk_horizon)}], got {horizon}"
+            )
         if horizon <= int(policy_low_watermark):
             raise ValueError(
                 "action_chunk_horizon must be greater than policy_low_watermark: "
