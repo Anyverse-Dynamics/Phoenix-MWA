@@ -44,7 +44,6 @@ from wam.datasets.lerobot.utils.rotation import (
     quaternion_to_axis_angle,
 )
 
-
 DEFAULT_PROMPT = "A video recorded from a robot's point of view executing the following instruction: {task}"
 V3_TASKS_PATH = "meta/tasks.parquet"
 V3_EPISODES_PATH = "meta/episodes/chunk-{chunk_index:03d}/file-{file_index:03d}.parquet"
@@ -75,6 +74,7 @@ def _profile_print() -> None:
     for name, elapsed_s, info in _PROFILE_EVENTS:
         info_text = " ".join(f"{k}={v}" for k, v in info.items() if v is not None)
         print(f"[profile] {name}: {elapsed_s:.3f}s {info_text}".rstrip(), flush=True)
+
 
 JSON_DECODE_RETRIES = 3
 JSON_RETRY_BASE_DELAY_SECONDS = 1.0
@@ -120,10 +120,17 @@ def _resolve_local_dataset_root(path: str, data_root: str | None = None) -> str:
     if not value:
         raise ValueError("dataset root is empty")
     if _is_remote_url(value):
-        raise ValueError("Download the dataset locally and set its root to a filesystem path.")
+        raise ValueError(
+            "Download the dataset locally and set its root to a filesystem path."
+        )
     target = Path(value).expanduser()
     if not target.is_absolute():
-        target = Path(data_root or os.environ.get("WAM_DATA_ROOT", DEFAULT_DATA_ROOT)).expanduser() / target
+        target = (
+            Path(
+                data_root or os.environ.get("WAM_DATA_ROOT", DEFAULT_DATA_ROOT)
+            ).expanduser()
+            / target
+        )
     return str(target.resolve())
 
 
@@ -141,7 +148,9 @@ def _jsonl_loads(raw: bytes) -> list[dict[str, Any]]:
         line = line.strip()
         if line:
             records.append(json.loads(line))
-    _profile_record("jsonl.loads", time.perf_counter() - t0, bytes=len(raw), records=len(records))
+    _profile_record(
+        "jsonl.loads", time.perf_counter() - t0, bytes=len(raw), records=len(records)
+    )
     return records
 
 
@@ -243,11 +252,15 @@ def _feature_dims(info: dict[str, Any], keys: list[str]) -> int | None:
     return total
 
 
-def _pad_last_dim(x: torch.Tensor, target_dim: int | None) -> tuple[torch.Tensor, torch.Tensor]:
+def _pad_last_dim(
+    x: torch.Tensor, target_dim: int | None
+) -> tuple[torch.Tensor, torch.Tensor]:
     if target_dim is None:
         target_dim = int(x.shape[-1])
     if int(x.shape[-1]) > int(target_dim):
-        raise ValueError(f"Cannot pad tensor with last dim {x.shape[-1]} to smaller target_dim={target_dim}")
+        raise ValueError(
+            f"Cannot pad tensor with last dim {x.shape[-1]} to smaller target_dim={target_dim}"
+        )
     pad_dim = int(target_dim) - int(x.shape[-1])
     if pad_dim > 0:
         x = torch.nn.functional.pad(x, (0, pad_dim))
@@ -265,7 +278,9 @@ def _safe_name(text: str) -> str:
 
 
 def _safe_rel_path(text: str) -> str:
-    parts = [_safe_name(part) for part in str(text).strip("/").split("/") if part.strip("/")]
+    parts = [
+        _safe_name(part) for part in str(text).strip("/").split("/") if part.strip("/")
+    ]
     return "/".join(part for part in parts if part)
 
 
@@ -284,6 +299,7 @@ def _relative_remote_cache_path(remote_root: str | None) -> str:
         raise ValueError("Use a local dataset path")
     return _safe_rel_path(text)
 
+
 def _format_template(
     template: str | None,
     *,
@@ -299,7 +315,13 @@ def _format_template(
     if template in (None, ""):
         return None
     clean_path = str(path).strip("/")
-    clean_remote = _safe_rel_path(relative_remote or _relative_remote_cache_path(remote) or remote or name or "dataset")
+    clean_remote = _safe_rel_path(
+        relative_remote
+        or _relative_remote_cache_path(remote)
+        or remote
+        or name
+        or "dataset"
+    )
     values = {
         "name": _safe_name(name),
         "path": clean_path,
@@ -309,7 +331,9 @@ def _format_template(
         "safe_remote": _safe_name(remote or clean_remote or "dataset"),
         "source": _safe_name(source or remote or "source"),
         "embodiment": _safe_name(embodiment or "default"),
-        "cache_root": str(cache_root or extra.get("cache_root") or DEFAULT_CACHE_ROOT).rstrip("/"),
+        "cache_root": str(
+            cache_root or extra.get("cache_root") or DEFAULT_CACHE_ROOT
+        ).rstrip("/"),
     }
     for key, value in extra.items():
         if key == "cache_root":
@@ -324,11 +348,16 @@ def _weight_override_value(value: Any) -> tuple[float | None, bool | None]:
     if isinstance(value, dict):
         weight = value.get("dataset_weight", value.get("weight"))
         distribute = value.get("distribute_weights")
-        return (None if weight is None else float(weight), None if distribute is None else bool(distribute))
+        return (
+            None if weight is None else float(weight),
+            None if distribute is None else bool(distribute),
+        )
     return float(value), None
 
 
-def _apply_weight_override(weight: float, distribute: bool, override: Any) -> tuple[float, bool]:
+def _apply_weight_override(
+    weight: float, distribute: bool, override: Any
+) -> tuple[float, bool]:
     new_weight, new_distribute = _weight_override_value(override)
     if new_weight is not None:
         weight = float(new_weight)
@@ -376,9 +405,13 @@ def _table_to_tensors(table: Any) -> dict[str, torch.Tensor | list[Any]]:
     return out
 
 
-def _select_rows(data: dict[str, torch.Tensor | list[Any]], key: str, indices: list[int]) -> torch.Tensor | list[Any]:
+def _select_rows(
+    data: dict[str, torch.Tensor | list[Any]], key: str, indices: list[int]
+) -> torch.Tensor | list[Any]:
     if key not in data:
-        raise KeyError(f"Missing column {key!r}; available columns: {sorted(data.keys())}")
+        raise KeyError(
+            f"Missing column {key!r}; available columns: {sorted(data.keys())}"
+        )
     value = data[key]
     if isinstance(value, torch.Tensor):
         return value[torch.as_tensor(indices, dtype=torch.long)]
@@ -391,16 +424,22 @@ def _as_feature_matrix(value: torch.Tensor, key: str) -> torch.Tensor:
     if value.ndim > 2:
         return value.flatten(1)
     if value.ndim == 0:
-        raise ValueError(f"Column {key!r} produced a scalar tensor; expected one value per frame.")
+        raise ValueError(
+            f"Column {key!r} produced a scalar tensor; expected one value per frame."
+        )
     return value
 
 
-def _select_rows_concat(data: dict[str, torch.Tensor | list[Any]], keys: list[str], indices: list[int]) -> torch.Tensor:
+def _select_rows_concat(
+    data: dict[str, torch.Tensor | list[Any]], keys: list[str], indices: list[int]
+) -> torch.Tensor:
     parts: list[torch.Tensor] = []
     for key in keys:
         selected = _select_rows(data, key, indices)
         if not isinstance(selected, torch.Tensor):
-            raise TypeError(f"Column {key!r} is not numeric and cannot be used as state/action.")
+            raise TypeError(
+                f"Column {key!r} is not numeric and cannot be used as state/action."
+            )
         parts.append(_as_feature_matrix(selected, key))
     if not parts:
         raise ValueError("No feature keys configured for state/action.")
@@ -415,7 +454,9 @@ def _parquet_num_rows(data: dict[str, torch.Tensor | list[Any]]) -> int:
         elif isinstance(value, list):
             lengths.append(len(value))
     if not lengths:
-        raise RuntimeError("Could not infer parquet row count from loaded episode columns.")
+        raise RuntimeError(
+            "Could not infer parquet row count from loaded episode columns."
+        )
     return min(lengths)
 
 
@@ -436,7 +477,9 @@ def _canonical_adapter_dim(adapter: dict[str, Any]) -> int | None:
     return CANONICAL_LAYOUT_DIMS.get(str(layout))
 
 
-def _slice_last_dim(x: torch.Tensor, raw_slice: list[Any] | tuple[Any, ...] | None) -> torch.Tensor:
+def _slice_last_dim(
+    x: torch.Tensor, raw_slice: list[Any] | tuple[Any, ...] | None
+) -> torch.Tensor:
     x = _as_feature_matrix(x, "canonical")
     if raw_slice is None:
         return x
@@ -449,14 +492,23 @@ def _slice_last_dim(x: torch.Tensor, raw_slice: list[Any] | tuple[Any, ...] | No
     return x[..., start:end]
 
 
-def _select_feature(data: dict[str, torch.Tensor | list[Any]], key: str, indices: list[int], raw_slice: list[Any] | tuple[Any, ...] | None = None) -> torch.Tensor:
+def _select_feature(
+    data: dict[str, torch.Tensor | list[Any]],
+    key: str,
+    indices: list[int],
+    raw_slice: list[Any] | tuple[Any, ...] | None = None,
+) -> torch.Tensor:
     value = _select_rows(data, key, indices)
     if not isinstance(value, torch.Tensor):
-        raise TypeError(f"Column {key!r} is not numeric and cannot be used by canonical_adapter.")
+        raise TypeError(
+            f"Column {key!r} is not numeric and cannot be used by canonical_adapter."
+        )
     return _slice_last_dim(value, raw_slice).to(torch.float32)
 
 
-def _component_raw_slice(component: dict[str, Any], kind: str) -> list[Any] | tuple[Any, ...] | None:
+def _component_raw_slice(
+    component: dict[str, Any], kind: str
+) -> list[Any] | tuple[Any, ...] | None:
     return component.get(f"{kind}_raw_slice") or component.get("raw_slice")
 
 
@@ -472,7 +524,9 @@ def _quat_to_rotvec_wxyz(q: torch.Tensor) -> torch.Tensor:
     xyz = q[..., 1:]
     sin_half = xyz.norm(dim=-1, keepdim=True)
     angle = 2.0 * torch.atan2(sin_half, w)
-    scale = torch.where(sin_half > 1e-8, angle / sin_half, 2.0 * torch.ones_like(sin_half))
+    scale = torch.where(
+        sin_half > 1e-8, angle / sin_half, 2.0 * torch.ones_like(sin_half)
+    )
     return xyz * scale
 
 
@@ -506,8 +560,16 @@ def _quat_mul_wxyz(a: torch.Tensor, b: torch.Tensor) -> torch.Tensor:
 def _rpy_to_rotvec(rpy: torch.Tensor) -> torch.Tensor:
     # Roll-pitch-yaw in XYZ convention, converted through quaternion.
     half = rpy.to(torch.float32) * 0.5
-    cr, cp, cy = torch.cos(half[..., 0:1]), torch.cos(half[..., 1:2]), torch.cos(half[..., 2:3])
-    sr, sp, sy = torch.sin(half[..., 0:1]), torch.sin(half[..., 1:2]), torch.sin(half[..., 2:3])
+    cr, cp, cy = (
+        torch.cos(half[..., 0:1]),
+        torch.cos(half[..., 1:2]),
+        torch.cos(half[..., 2:3]),
+    )
+    sr, sp, sy = (
+        torch.sin(half[..., 0:1]),
+        torch.sin(half[..., 1:2]),
+        torch.sin(half[..., 2:3]),
+    )
     qw = cr * cp * cy + sr * sp * sy
     qx = sr * cp * cy - cr * sp * sy
     qy = cr * sp * cy + sr * cp * sy
@@ -523,12 +585,20 @@ def _pose_to_xyz_rotvec(value: torch.Tensor, pose_input: str) -> torch.Tensor:
         return value
     if pose_input == "xyz_quat_wxyz":
         if value.shape[-1] != 7:
-            raise ValueError(f"xyz_quat_wxyz pose expects 7 dims, got {value.shape[-1]}")
-        return torch.cat([value[..., :3], _quat_to_rotvec_wxyz(value[..., 3:7])], dim=-1)
+            raise ValueError(
+                f"xyz_quat_wxyz pose expects 7 dims, got {value.shape[-1]}"
+            )
+        return torch.cat(
+            [value[..., :3], _quat_to_rotvec_wxyz(value[..., 3:7])], dim=-1
+        )
     if pose_input == "xyz_quat_xyzw":
         if value.shape[-1] != 7:
-            raise ValueError(f"xyz_quat_xyzw pose expects 7 dims, got {value.shape[-1]}")
-        return torch.cat([value[..., :3], _quat_to_rotvec_xyzw(value[..., 3:7])], dim=-1)
+            raise ValueError(
+                f"xyz_quat_xyzw pose expects 7 dims, got {value.shape[-1]}"
+            )
+        return torch.cat(
+            [value[..., :3], _quat_to_rotvec_xyzw(value[..., 3:7])], dim=-1
+        )
     if pose_input in {"xyz_rpy", "delta_xyz_rpy"}:
         if value.shape[-1] != 6:
             raise ValueError(f"{pose_input} pose expects 6 dims, got {value.shape[-1]}")
@@ -536,7 +606,9 @@ def _pose_to_xyz_rotvec(value: torch.Tensor, pose_input: str) -> torch.Tensor:
     raise ValueError(f"Unsupported canonical_adapter pose_input={pose_input!r}")
 
 
-def _pose_output_format(kind: str, adapter: dict[str, Any], component: dict[str, Any]) -> str:
+def _pose_output_format(
+    kind: str, adapter: dict[str, Any], component: dict[str, Any]
+) -> str:
     return str(
         component.get(f"{kind}_pose_output")
         or component.get("pose_output")
@@ -573,8 +645,8 @@ def _interpolate_xyz_rot6d_pose(
     relative_rotation = current_rotation.transpose(-1, -2) @ future_rotation
     relative_rotvec = _matrix_to_rotvec(relative_rotation)
     rotation = current_rotation @ _rotvec_to_matrix(alpha * relative_rotvec)
-    rotation_6d = rotation[..., :, :2].transpose(-1, -2).reshape(
-        *rotation.shape[:-2], 6
+    rotation_6d = (
+        rotation[..., :, :2].transpose(-1, -2).reshape(*rotation.shape[:-2], 6)
     )
     return torch.cat((xyz, rotation_6d), dim=-1)
 
@@ -628,20 +700,32 @@ def _format_xyz_rotvec_pose(pose: torch.Tensor, pose_output: str) -> torch.Tenso
     raise ValueError(f"Unsupported canonical_adapter pose_output={pose_output!r}")
 
 
-def _pose_xyz_quat_wxyz(value: torch.Tensor, pose_input: str) -> tuple[torch.Tensor, torch.Tensor]:
+def _pose_xyz_quat_wxyz(
+    value: torch.Tensor, pose_input: str
+) -> tuple[torch.Tensor, torch.Tensor]:
     value = _as_feature_matrix(value, "pose").to(torch.float32)
     if pose_input == "xyz_quat_wxyz":
         if value.shape[-1] != 7:
-            raise ValueError(f"xyz_quat_wxyz pose expects 7 dims, got {value.shape[-1]}")
+            raise ValueError(
+                f"xyz_quat_wxyz pose expects 7 dims, got {value.shape[-1]}"
+            )
         return value[..., :3], _normalize_quat(value[..., 3:7])
     if pose_input == "xyz_quat_xyzw":
         if value.shape[-1] != 7:
-            raise ValueError(f"xyz_quat_xyzw pose expects 7 dims, got {value.shape[-1]}")
-        return value[..., :3], _normalize_quat(torch.cat([value[..., 6:7], value[..., 3:6]], dim=-1))
-    raise ValueError(f"state-derived action requires quaternion pose input, got {pose_input!r}")
+            raise ValueError(
+                f"xyz_quat_xyzw pose expects 7 dims, got {value.shape[-1]}"
+            )
+        return value[..., :3], _normalize_quat(
+            torch.cat([value[..., 6:7], value[..., 3:6]], dim=-1)
+        )
+    raise ValueError(
+        f"state-derived action requires quaternion pose input, got {pose_input!r}"
+    )
 
 
-def _pose_delta_xyz_rotvec(current: torch.Tensor, future: torch.Tensor, pose_input: str) -> torch.Tensor:
+def _pose_delta_xyz_rotvec(
+    current: torch.Tensor, future: torch.Tensor, pose_input: str
+) -> torch.Tensor:
     cur_xyz, cur_quat = _pose_xyz_quat_wxyz(current, pose_input)
     next_xyz, next_quat = _pose_xyz_quat_wxyz(future, pose_input)
     delta_quat = _quat_mul_wxyz(_quat_conj_wxyz(cur_quat), next_quat)
@@ -679,11 +763,15 @@ def _matrix_to_rotvec(rotation: torch.Tensor) -> torch.Tensor:
     return quaternion_to_axis_angle(matrix_to_quaternion(r))
 
 
-def _rotation_matrix_from_config(value: Any, *, dtype: torch.dtype, device: torch.device) -> torch.Tensor:
+def _rotation_matrix_from_config(
+    value: Any, *, dtype: torch.dtype, device: torch.device
+) -> torch.Tensor:
     if value is None:
         return torch.eye(3, dtype=dtype, device=device)
     if isinstance(value, dict):
-        value = value.get("matrix", value.get("rotation", value.get("name", value.get("preset"))))
+        value = value.get(
+            "matrix", value.get("rotation", value.get("name", value.get("preset")))
+        )
     if isinstance(value, str):
         name = value.strip().lower()
         presets = {
@@ -719,7 +807,9 @@ def _rotation_matrix_from_config(value: Any, *, dtype: torch.dtype, device: torc
     return mat
 
 
-def _merge_frame_transform(adapter: dict[str, Any], component: dict[str, Any], kind: str) -> dict[str, Any]:
+def _merge_frame_transform(
+    adapter: dict[str, Any], component: dict[str, Any], kind: str
+) -> dict[str, Any]:
     cfg: dict[str, Any] = {}
     for source in (
         adapter.get("frame_transform"),
@@ -732,14 +822,18 @@ def _merge_frame_transform(adapter: dict[str, Any], component: dict[str, Any], k
     return cfg
 
 
-def _pose_is_delta(kind: str, pose_input: str, adapter: dict[str, Any], component: dict[str, Any]) -> bool:
+def _pose_is_delta(
+    kind: str, pose_input: str, adapter: dict[str, Any], component: dict[str, Any]
+) -> bool:
     semantic = _pose_semantics(kind, adapter, component)
     if semantic is not None:
         return semantic in {"delta", "relative", "velocity"}
     return kind == "action" and str(pose_input).startswith("delta_")
 
 
-def _pose_semantics(kind: str, adapter: dict[str, Any], component: dict[str, Any]) -> str | None:
+def _pose_semantics(
+    kind: str, adapter: dict[str, Any], component: dict[str, Any]
+) -> str | None:
     semantic = (
         component.get(f"{kind}_pose_semantics")
         or component.get("pose_semantics")
@@ -761,12 +855,17 @@ def _uses_state_delta_common(
     )
 
 
-def _transform_xyz_rotvec_pose(pose: torch.Tensor, frame_transform: dict[str, Any], *, is_delta: bool) -> torch.Tensor:
+def _transform_xyz_rotvec_pose(
+    pose: torch.Tensor, frame_transform: dict[str, Any], *, is_delta: bool
+) -> torch.Tensor:
     if not frame_transform:
         return pose
     dtype, device = pose.dtype, pose.device
     world_from_source = _rotation_matrix_from_config(
-        frame_transform.get("world_from_source", frame_transform.get("canonical_world_from_source_world")),
+        frame_transform.get(
+            "world_from_source",
+            frame_transform.get("canonical_world_from_source_world"),
+        ),
         dtype=dtype,
         device=device,
     )
@@ -775,11 +874,16 @@ def _transform_xyz_rotvec_pose(pose: torch.Tensor, frame_transform: dict[str, An
         frame_transform.get("canonical_local_from_source_local"),
     )
     if canonical_ee_from_source_cfg is not None:
-        canonical_ee_from_source = _rotation_matrix_from_config(canonical_ee_from_source_cfg, dtype=dtype, device=device)
+        canonical_ee_from_source = _rotation_matrix_from_config(
+            canonical_ee_from_source_cfg, dtype=dtype, device=device
+        )
         source_ee_from_canonical = canonical_ee_from_source.transpose(-1, -2)
     else:
         source_ee_from_canonical = _rotation_matrix_from_config(
-            frame_transform.get("source_ee_from_canonical_ee", frame_transform.get("source_local_from_canonical_local")),
+            frame_transform.get(
+                "source_ee_from_canonical_ee",
+                frame_transform.get("source_local_from_canonical_local"),
+            ),
             dtype=dtype,
             device=device,
         )
@@ -791,12 +895,25 @@ def _transform_xyz_rotvec_pose(pose: torch.Tensor, frame_transform: dict[str, An
         delta_frame = str(
             frame_transform.get(
                 "delta_frame",
-                frame_transform.get("action_delta_frame", frame_transform.get("delta_pose_frame", "world")),
+                frame_transform.get(
+                    "action_delta_frame",
+                    frame_transform.get("delta_pose_frame", "world"),
+                ),
             )
         ).lower()
-        if delta_frame in {"eef_local", "ee_local", "local", "source_ee", "source_local"}:
+        if delta_frame in {
+            "eef_local",
+            "ee_local",
+            "local",
+            "source_ee",
+            "source_local",
+        }:
             xyz_out = torch.einsum("ij,...j->...i", canonical_ee_from_source, xyz)
-            rot_out = canonical_ee_from_source @ rot @ canonical_ee_from_source.transpose(-1, -2)
+            rot_out = (
+                canonical_ee_from_source
+                @ rot
+                @ canonical_ee_from_source.transpose(-1, -2)
+            )
         else:
             xyz_out = torch.einsum("ij,...j->...i", world_from_source, xyz)
             rot_out = world_from_source @ rot @ world_from_source.transpose(-1, -2)
@@ -806,17 +923,23 @@ def _transform_xyz_rotvec_pose(pose: torch.Tensor, frame_transform: dict[str, An
     return torch.cat([xyz_out, _matrix_to_rotvec(rot_out)], dim=-1)
 
 
-def _pose_delta_from_transformed_xyz_rotvec(current_pose: torch.Tensor, future_pose: torch.Tensor) -> torch.Tensor:
+def _pose_delta_from_transformed_xyz_rotvec(
+    current_pose: torch.Tensor, future_pose: torch.Tensor
+) -> torch.Tensor:
     current_rot = _rotvec_to_matrix(current_pose[..., 3:6])
     future_rot = _rotvec_to_matrix(future_pose[..., 3:6])
     current_from_world = current_rot.transpose(-1, -2)
     delta_xyz_world = future_pose[..., :3] - current_pose[..., :3]
-    delta_xyz_local = torch.einsum("...ij,...j->...i", current_from_world, delta_xyz_world)
+    delta_xyz_local = torch.einsum(
+        "...ij,...j->...i", current_from_world, delta_xyz_world
+    )
     delta_rot = current_from_world @ future_rot
     return torch.cat([delta_xyz_local, _matrix_to_rotvec(delta_rot)], dim=-1)
 
 
-def _pose_delta_world_from_transformed_xyz_rotvec(current_pose: torch.Tensor, future_pose: torch.Tensor) -> torch.Tensor:
+def _pose_delta_world_from_transformed_xyz_rotvec(
+    current_pose: torch.Tensor, future_pose: torch.Tensor
+) -> torch.Tensor:
     current_rot = _rotvec_to_matrix(current_pose[..., 3:6])
     future_rot = _rotvec_to_matrix(future_pose[..., 3:6])
     delta_xyz_world = future_pose[..., :3] - current_pose[..., :3]
@@ -831,14 +954,21 @@ def _xyz_rot6d_to_xyz_rotvec(pose: torch.Tensor) -> torch.Tensor:
     return torch.cat((pose[..., :3], _matrix_to_rotvec(rotation)), dim=-1)
 
 
-def _assign_target(out: torch.Tensor, dim_mask: torch.Tensor, target_slice: list[Any] | tuple[Any, ...], values: torch.Tensor) -> None:
+def _assign_target(
+    out: torch.Tensor,
+    dim_mask: torch.Tensor,
+    target_slice: list[Any] | tuple[Any, ...],
+    values: torch.Tensor,
+) -> None:
     if not isinstance(target_slice, (list, tuple)) or len(target_slice) != 2:
         raise ValueError(f"target_slice must be [start, end], got {target_slice!r}")
     start, end = int(target_slice[0]), int(target_slice[1])
     expected = end - start
     values = _as_feature_matrix(values, "target").to(out.dtype)
     if values.shape[-1] != expected:
-        raise ValueError(f"target_slice {target_slice!r} expects {expected} dims, got {values.shape[-1]}")
+        raise ValueError(
+            f"target_slice {target_slice!r} expects {expected} dims, got {values.shape[-1]}"
+        )
     out[..., start:end] = values
     dim_mask[start:end] = False
 
@@ -880,26 +1010,20 @@ def _decode_pyav_timestamp_group(
         first_ts = float(min(query_timestamps))
         if stream.time_base is not None:
             seek_offset = int(first_ts / float(stream.time_base))
-            container.seek(
-                seek_offset, any_frame=False, backward=True, stream=stream
-            )
+            container.seek(seek_offset, any_frame=False, backward=True, stream=stream)
         else:
             container.seek(0, any_frame=False, backward=True)
 
         query_ts = np.asarray(query_timestamps, dtype=np.float64)
         ordered_indices = np.argsort(query_ts, kind="stable").tolist()
         best_frames: list[np.ndarray | None] = [None] * len(query_timestamps)
-        best_errors = np.full(
-            len(query_timestamps), np.inf, dtype=np.float64
-        )
+        best_errors = np.full(len(query_timestamps), np.inf, dtype=np.float64)
         next_query = 0
         candidate_frames = 0
         previous_frame = None
         previous_ts = None
         fallback_fps = (
-            float(stream.average_rate)
-            if stream.average_rate is not None
-            else 30.0
+            float(stream.average_rate) if stream.average_rate is not None else 30.0
         )
         for frame_idx, frame in enumerate(container.decode(stream)):
             if frame.pts is not None and stream.time_base is not None:
@@ -920,14 +1044,11 @@ def _decode_pyav_timestamp_group(
                 target_ts = query_ts[index]
                 if ts < target_ts:
                     break
-                if (
-                    previous_ts is not None
-                    and abs(previous_ts - target_ts) <= abs(ts - target_ts)
+                if previous_ts is not None and abs(previous_ts - target_ts) <= abs(
+                    ts - target_ts
                 ):
                     if previous_rgb is None:
-                        previous_rgb = previous_frame.to_ndarray(
-                            format="rgb24"
-                        )
+                        previous_rgb = previous_frame.to_ndarray(format="rgb24")
                     best_frames[index] = previous_rgb
                     best_errors[index] = abs(previous_ts - target_ts)
                 else:
@@ -952,12 +1073,7 @@ def _decode_pyav_timestamp_group(
         if max_err > max(tolerance_s, 1.0 / 30.0 + tolerance_s):
             _profile_record("video.timestamp_warning", 0.0, max_err=max_err)
         arr = np.stack(best_frames, axis=0)
-        frames = (
-            torch.from_numpy(arr)
-            .permute(0, 3, 1, 2)
-            .to(torch.float32)
-            / 255.0
-        )
+        frames = torch.from_numpy(arr).permute(0, 3, 1, 2).to(torch.float32) / 255.0
         return frames, candidate_frames
 
     frames, candidate_frames = decode_once(timestamps)
@@ -993,7 +1109,9 @@ def _decode_mp4_groups_lerobot(
         return decoded
 
     if backend is None:
-        from wam.datasets.lerobot.lerobot.datasets.video_utils import get_safe_default_codec
+        from wam.datasets.lerobot.lerobot.datasets.video_utils import (
+            get_safe_default_codec,
+        )
 
         requested_backend = get_safe_default_codec()
     else:
@@ -1002,9 +1120,7 @@ def _decode_mp4_groups_lerobot(
         try:
             from torchcodec.decoders import VideoDecoder
 
-            decoder = VideoDecoder(
-                source, device="cpu", seek_mode="approximate"
-            )
+            decoder = VideoDecoder(source, device="cpu", seek_mode="approximate")
             for key, timestamps in nonempty_groups.items():
                 t0 = time.perf_counter()
                 frame_indices = [
@@ -1012,8 +1128,7 @@ def _decode_mp4_groups_lerobot(
                     for timestamp in timestamps
                 ]
                 decoded[key] = (
-                    decoder.get_frames_at(indices=frame_indices)
-                    .data.to(torch.float32)
+                    decoder.get_frames_at(indices=frame_indices).data.to(torch.float32)
                     / 255.0
                 )
                 _profile_record(
@@ -1163,6 +1278,7 @@ def _eef_local_translation_to_common(
     )
     return torch.cat((common_translation, delta_xyz_rotvec[..., 3:6]), dim=-1)
 
+
 def _urdf_fk_xyz_rotvec(
     joint_values: torch.Tensor,
     fk: dict[str, Any],
@@ -1211,7 +1327,9 @@ def _urdf_fk_xyz_rotvec(
 
     batch_shape = values.shape[:-1]
     dtype, device = values.dtype, values.device
-    rotation = torch.eye(3, dtype=dtype, device=device).expand(*batch_shape, 3, 3).clone()
+    rotation = (
+        torch.eye(3, dtype=dtype, device=device).expand(*batch_shape, 3, 3).clone()
+    )
     translation = torch.zeros(*batch_shape, 3, dtype=dtype, device=device)
     for joint in chain:
         origin_xyz = torch.as_tensor(joint.xyz, dtype=dtype, device=device)
@@ -1221,13 +1339,17 @@ def _urdf_fk_xyz_rotvec(
         rotation = rotation @ origin_rotation
 
         if joint.kind not in {"revolute", "continuous", "prismatic", "fixed"}:
-            raise ValueError(f"Unsupported URDF joint type {joint.kind!r} for {joint.name!r}")
+            raise ValueError(
+                f"Unsupported URDF joint type {joint.kind!r} for {joint.name!r}"
+            )
         if joint.kind == "fixed":
             continue
         if joint.name in source_values:
             position = source_values[joint.name]
         elif joint.name in defaults:
-            position = torch.full(batch_shape, defaults[joint.name], dtype=dtype, device=device)
+            position = torch.full(
+                batch_shape, defaults[joint.name], dtype=dtype, device=device
+            )
         else:
             raise ValueError(
                 f"URDF chain joint {joint.name!r} is not mapped and has no default position"
@@ -1260,9 +1382,16 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
         self.spec = spec
         self.name = spec.name
         self.prompt_template = str(spec.prompt_template)
-        self.action_loss_normalization = str(spec.action_loss_normalization).strip().lower()
-        if self.action_loss_normalization not in {"legacy_per_sample", "weighted_valid_cells"}:
-            raise ValueError(f"Unsupported action loss normalization: {self.action_loss_normalization}")
+        self.action_loss_normalization = (
+            str(spec.action_loss_normalization).strip().lower()
+        )
+        if self.action_loss_normalization not in {
+            "legacy_per_sample",
+            "weighted_valid_cells",
+        }:
+            raise ValueError(
+                f"Unsupported action loss normalization: {self.action_loss_normalization}"
+            )
         for value in (spec.action_loss_weight, spec.action_gripper_loss_weight):
             if not math.isfinite(float(value)) or value <= 0:
                 raise ValueError("Action loss weights must be finite and positive")
@@ -1278,9 +1407,9 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
         self.canonical_adapter = spec.canonical_adapter or {}
         video_cfg = self.modalities.get("video")
         if isinstance(video_cfg, dict):
-            self.video_timestamp_source = str(
-                video_cfg.get("timestamp_source", "timestamp")
-            ).strip().lower()
+            self.video_timestamp_source = (
+                str(video_cfg.get("timestamp_source", "timestamp")).strip().lower()
+            )
         else:
             self.video_timestamp_source = "timestamp"
         if self.video_timestamp_source not in {"timestamp", "frame_index"}:
@@ -1297,12 +1426,16 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
         self.state_key = self.state_keys[0]
         self.action_key = self.action_keys[0]
         self.timestamp_key = _modality_key(self.modalities, "timestamp", "timestamp")
-        self.frame_index_key = _modality_key(self.modalities, "frame_index", "frame_index")
+        self.frame_index_key = _modality_key(
+            self.modalities, "frame_index", "frame_index"
+        )
         self.task_index_key = _modality_key(self.modalities, "task_index", "task_index")
         self.video_key = _modality_key(self.modalities, "video", "")
         self.video_keys_config = _modality_keys(self.modalities, "video", "")
         self.num_frames_per_sample = int(num_frames)
-        self.action_size = int(action_size if action_size is not None else num_frames - 1)
+        self.action_size = int(
+            action_size if action_size is not None else num_frames - 1
+        )
         self.global_sample_stride = int(global_sample_stride)
         if not math.isfinite(self.slow_motion_factor) or self.slow_motion_factor < 1.0:
             raise ValueError(
@@ -1326,10 +1459,16 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
         self.info = self._read_json("meta/info.json")
         self.info = _shape_tuple_inplace(self.info)
         self.format_major = self._detect_format_major()
-        available_video_keys = [key for key, ft in self.info.get("features", {}).items() if ft.get("dtype") == "video"]
+        available_video_keys = [
+            key
+            for key, ft in self.info.get("features", {}).items()
+            if ft.get("dtype") == "video"
+        ]
         configured_video_keys = [key for key in self.video_keys_config if key]
         if configured_video_keys:
-            missing_video_keys = [key for key in configured_video_keys if key not in available_video_keys]
+            missing_video_keys = [
+                key for key in configured_video_keys if key not in available_video_keys
+            ]
             if missing_video_keys:
                 raise KeyError(
                     f"Dataset {self.name} configured video keys not found in meta/info.json: "
@@ -1349,8 +1488,16 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
             self.state_target_dim = int(self.canonical_dim)
             self.action_target_dim = int(self.canonical_dim)
         else:
-            self.state_target_dim = int(spec.state_target_dim) if spec.state_target_dim is not None else self.state_dim
-            self.action_target_dim = int(spec.action_target_dim) if spec.action_target_dim is not None else self.action_dim
+            self.state_target_dim = (
+                int(spec.state_target_dim)
+                if spec.state_target_dim is not None
+                else self.state_dim
+            )
+            self.action_target_dim = (
+                int(spec.action_target_dim)
+                if spec.action_target_dim is not None
+                else self.action_dim
+            )
         _profile_record(
             "dataset.read_info",
             time.perf_counter() - t0,
@@ -1362,12 +1509,21 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
         )
         t0 = time.perf_counter()
         self.tasks = self._read_tasks()
-        self.task_to_index = {task: task_index for task_index, task in self.tasks.items()}
-        _profile_record("dataset.read_tasks", time.perf_counter() - t0, dataset=self.name, count=len(self.tasks))
+        self.task_to_index = {
+            task: task_index for task_index, task in self.tasks.items()
+        }
+        _profile_record(
+            "dataset.read_tasks",
+            time.perf_counter() - t0,
+            dataset=self.name,
+            count=len(self.tasks),
+        )
         self.segment_action_text_enabled = self._should_use_segment_action_text()
         self.subtask_action_segments: dict[int, tuple[tuple[int, int, str], ...]] = {}
 
-        loaded_path_index = path_index if path_index is not None else self._load_local_path_index()
+        loaded_path_index = (
+            path_index if path_index is not None else self._load_local_path_index()
+        )
         if loaded_path_index is not None:
             self._apply_path_index(loaded_path_index, episodes=episodes)
             self._load_subtask_action_segments()
@@ -1383,7 +1539,12 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
 
         t0 = time.perf_counter()
         self.episodes_dict = self._read_episodes()
-        _profile_record("dataset.read_episodes", time.perf_counter() - t0, dataset=self.name, count=len(self.episodes_dict))
+        _profile_record(
+            "dataset.read_episodes",
+            time.perf_counter() - t0,
+            dataset=self.name,
+            count=len(self.episodes_dict),
+        )
 
         path_index = self.export_path_index()
         self._write_local_path_index(path_index)
@@ -1393,7 +1554,10 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
     def _path_index_paths(self) -> list[Path]:
         if not self.use_path_index_cache or not self.spec.path_index_dir:
             return []
-        return [path / "path_index.jsonl" for path in _local_path_candidates(self.spec.path_index_dir)]
+        return [
+            path / "path_index.jsonl"
+            for path in _local_path_candidates(self.spec.path_index_dir)
+        ]
 
     def _path_index_path(self) -> Path | None:
         paths = self._path_index_paths()
@@ -1421,8 +1585,12 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
                     if not line.strip():
                         continue
                     row = json.loads(line)
-                    if not isinstance(row, dict) or not self._path_index_row_is_usable(row):
-                        raise ValueError(f"Invalid path-index row: {cache_path}:{line_number}")
+                    if not isinstance(row, dict) or not self._path_index_row_is_usable(
+                        row
+                    ):
+                        raise ValueError(
+                            f"Invalid path-index row: {cache_path}:{line_number}"
+                        )
                     rows.append(row)
             if not rows:
                 raise ValueError(
@@ -1430,7 +1598,6 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
                 )
             return rows
         return None
-
 
     def _write_local_path_index(self, rows: list[dict[str, Any]]) -> None:
         for cache_path in self._path_index_paths():
@@ -1444,15 +1611,26 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
                     delete=False,
                 ) as handle:
                     for row in rows:
-                        handle.write(json.dumps(row, ensure_ascii=False, separators=(",", ":")) + "\n")
+                        handle.write(
+                            json.dumps(row, ensure_ascii=False, separators=(",", ":"))
+                            + "\n"
+                        )
                     tmp_path = Path(handle.name)
                 tmp_path.replace(cache_path)
-                _profile_record("dataset.path_index_write", 0.0, dataset=self.name, path=str(cache_path), episodes=len(rows))
+                _profile_record(
+                    "dataset.path_index_write",
+                    0.0,
+                    dataset=self.name,
+                    path=str(cache_path),
+                    episodes=len(rows),
+                )
                 return
             except Exception:
                 continue
 
-    def _apply_path_index(self, rows: list[dict[str, Any]], *, episodes: list[int] | None = None) -> None:
+    def _apply_path_index(
+        self, rows: list[dict[str, Any]], *, episodes: list[int] | None = None
+    ) -> None:
         episodes_dict: dict[int, dict[str, Any]] = {}
         for row in rows:
             episode_index = int(row["episode_index"])
@@ -1460,7 +1638,10 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
                 "episode_index": episode_index,
                 "length": int(row.get("frame_count", row.get("length"))),
                 "data_path": str(row["data_path"]),
-                "video_paths": {str(key): str(value) for key, value in dict(row.get("video_paths") or {}).items()},
+                "video_paths": {
+                    str(key): str(value)
+                    for key, value in dict(row.get("video_paths") or {}).items()
+                },
             }
             for key in (
                 "task_index",
@@ -1475,12 +1656,17 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
                     item[key] = int(row[key])
             if isinstance(row.get("video_timestamp_offsets"), dict):
                 item["video_timestamp_offsets"] = {
-                    str(key): float(value) for key, value in row["video_timestamp_offsets"].items()
+                    str(key): float(value)
+                    for key, value in row["video_timestamp_offsets"].items()
                 }
             episodes_dict[episode_index] = item
         self.episodes_dict = episodes_dict
-        self.selected_episodes = list(episodes) if episodes is not None else sorted(self.episodes_dict)
-        self.episode_lengths = [int(self.episodes_dict[ep]["length"]) for ep in self.selected_episodes]
+        self.selected_episodes = (
+            list(episodes) if episodes is not None else sorted(self.episodes_dict)
+        )
+        self.episode_lengths = [
+            int(self.episodes_dict[ep]["length"]) for ep in self.selected_episodes
+        ]
         self.cumulative_lengths = np.cumsum(self.episode_lengths).tolist()
         self.trajectory_ids = np.asarray(self.selected_episodes, dtype=np.int64)
         self.trajectory_lengths = np.asarray(self.episode_lengths, dtype=np.int64)
@@ -1512,7 +1698,9 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
     def source_frame_index(self, episode_index: int, frame_idx: int) -> int:
         return self.episode_start_frame(int(episode_index)) + int(frame_idx)
 
-    def source_frame_indices(self, episode_index: int, frame_indices: list[int] | torch.Tensor) -> list[int]:
+    def source_frame_indices(
+        self, episode_index: int, frame_indices: list[int] | torch.Tensor
+    ) -> list[int]:
         start = self.episode_start_frame(int(episode_index))
         if isinstance(frame_indices, torch.Tensor):
             values = frame_indices.detach().to(device="cpu", dtype=torch.long).tolist()
@@ -1578,13 +1766,17 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
             episodes=len(loaded),
         )
 
-    def _subtask_segments_for_episode(self, episode_index: int) -> tuple[tuple[int, int, str], ...]:
+    def _subtask_segments_for_episode(
+        self, episode_index: int
+    ) -> tuple[tuple[int, int, str], ...]:
         if not self.subtask_action_segments:
             return tuple()
         source_episode = self.source_episode_index(int(episode_index))
         return self.subtask_action_segments.get(int(source_episode), tuple())
 
-    def _subtask_for_source_frame(self, episode_index: int, source_frame_idx: int) -> tuple[int, int, str] | None:
+    def _subtask_for_source_frame(
+        self, episode_index: int, source_frame_idx: int
+    ) -> tuple[int, int, str] | None:
         segments = self._subtask_segments_for_episode(int(episode_index))
         if not segments:
             return None
@@ -1669,7 +1861,9 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
         )
         if not intervals:
             return None
-        counts = np.asarray([end - start + 1 for start, end in intervals], dtype=np.float64)
+        counts = np.asarray(
+            [end - start + 1 for start, end in intervals], dtype=np.float64
+        )
         seg_idx = int(rng.choice(len(intervals), p=counts / counts.sum()))
         start, end = intervals[seg_idx]
         return int(rng.integers(int(start), int(end) + 1))
@@ -1710,7 +1904,6 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
             f"trajectory_pos={trajectory_pos}, count={total}"
         )
 
-
     def _episode_task_index_from_metadata(self, episode: dict[str, Any]) -> int | None:
         for key in ("task_index", "tasks_index", "task_indices"):
             value = self._scalar(episode.get(key))
@@ -1739,16 +1932,24 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
         try:
             return local_path.relative_to(root).as_posix()
         except ValueError as exc:
-            raise ValueError(f"Indexed files must be within the dataset root {root}: {path}") from exc
+            raise ValueError(
+                f"Indexed files must be within the dataset root {root}: {path}"
+            ) from exc
 
-    def _path_index_row(self, episode_index: int, episode: dict[str, Any]) -> dict[str, Any]:
+    def _path_index_row(
+        self, episode_index: int, episode: dict[str, Any]
+    ) -> dict[str, Any]:
         entry: dict[str, Any] = {
             "episode_index": int(episode_index),
             "frame_count": int(episode["length"]),
             "start_frame": 0,
-            "data_path": self._index_relative_path(self._data_rel_path(int(episode_index))),
+            "data_path": self._index_relative_path(
+                self._data_rel_path(int(episode_index))
+            ),
             "video_paths": {
-                key: self._index_relative_path(self._video_rel_path(int(episode_index), key))
+                key: self._index_relative_path(
+                    self._video_rel_path(int(episode_index), key)
+                )
                 for key in self.video_keys
             },
         }
@@ -1760,7 +1961,9 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
             if bounds is not None:
                 entry["data_from_index"] = int(bounds[0])
                 entry["data_to_index"] = int(bounds[1])
-            entry["data_file_ordinal"] = int(self._v3_data_file_ordinal_from_episode(int(episode_index)))
+            entry["data_file_ordinal"] = int(
+                self._v3_data_file_ordinal_from_episode(int(episode_index))
+            )
             video_offsets: dict[str, float] = {}
             for key in self.video_keys:
                 offset = self._video_timestamp_offset(int(episode_index), key)
@@ -1771,7 +1974,10 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
         return entry
 
     def export_path_index(self) -> list[dict[str, Any]]:
-        return [self._path_index_row(int(key), self.episodes_dict[key]) for key in sorted(self.episodes_dict)]
+        return [
+            self._path_index_row(int(key), self.episodes_dict[key])
+            for key in sorted(self.episodes_dict)
+        ]
 
     @property
     def is_v3(self) -> bool:
@@ -1780,13 +1986,20 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
     def _detect_format_major(self) -> int:
         if self.spec.format_version is not None:
             return int(self.spec.format_version)
-        version = str(self.info.get("codebase_version", "v2.1")).strip().lower().lstrip("v")
+        version = (
+            str(self.info.get("codebase_version", "v2.1")).strip().lower().lstrip("v")
+        )
         try:
             return int(version.split(".", 1)[0])
         except ValueError:
             return 2
 
-    def set_target_dims(self, *, action_target_dim: int | None = None, state_target_dim: int | None = None) -> None:
+    def set_target_dims(
+        self,
+        *,
+        action_target_dim: int | None = None,
+        state_target_dim: int | None = None,
+    ) -> None:
         if action_target_dim is not None:
             self.action_target_dim = int(action_target_dim)
         if state_target_dim is not None:
@@ -1816,7 +2029,13 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
             if key in features and _is_numeric_feature(self.info, key):
                 return [key]
 
-        skip_tokens = ("timestamp", "frame_index", "episode_index", "task_index", "index")
+        skip_tokens = (
+            "timestamp",
+            "frame_index",
+            "episode_index",
+            "task_index",
+            "index",
+        )
         keys: list[str] = []
         if name == "action":
             prefixes = ("action", "actions")
@@ -1825,11 +2044,17 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
 
         for key in features:
             lowered = key.lower()
-            if any(token == lowered or lowered.endswith("." + token) for token in skip_tokens):
+            if any(
+                token == lowered or lowered.endswith("." + token)
+                for token in skip_tokens
+            ):
                 continue
             if not _is_numeric_feature(self.info, key):
                 continue
-            if any(lowered == prefix or lowered.startswith(prefix + ".") for prefix in prefixes):
+            if any(
+                lowered == prefix or lowered.startswith(prefix + ".")
+                for prefix in prefixes
+            ):
                 keys.append(key)
 
         if keys:
@@ -1842,7 +2067,9 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
                 return [key]
         return []
 
-    def _resolve_feature_key(self, name: str, current: str, candidates: tuple[str, ...]) -> str:
+    def _resolve_feature_key(
+        self, name: str, current: str, candidates: tuple[str, ...]
+    ) -> str:
         features = self.info.get("features", {})
         if current in features:
             return current
@@ -1851,7 +2078,9 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
         inferred = self._infer_vector_keys(name, candidates)
         return inferred[0] if inferred else current
 
-    def _resolve_vector_keys(self, name: str, current: list[str], candidates: tuple[str, ...]) -> list[str]:
+    def _resolve_vector_keys(
+        self, name: str, current: list[str], candidates: tuple[str, ...]
+    ) -> list[str]:
         features = self.info.get("features", {})
         if current and all(key in features for key in current):
             return current
@@ -1872,17 +2101,25 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
                 "observation.ee_state",
             ),
         )
-        self.action_keys = self._resolve_vector_keys("action", self.action_keys, ("action", "actions"))
+        self.action_keys = self._resolve_vector_keys(
+            "action", self.action_keys, ("action", "actions")
+        )
         self.state_key = self.state_keys[0]
         self.action_key = self.action_keys[0]
-        self.timestamp_key = self._resolve_feature_key("timestamp", self.timestamp_key, ("timestamp",))
-        self.frame_index_key = self._resolve_feature_key("frame_index", self.frame_index_key, ("frame_index",))
-        self.task_index_key = self._resolve_feature_key("task_index", self.task_index_key, ("task_index",))
+        self.timestamp_key = self._resolve_feature_key(
+            "timestamp", self.timestamp_key, ("timestamp",)
+        )
+        self.frame_index_key = self._resolve_feature_key(
+            "frame_index", self.frame_index_key, ("frame_index",)
+        )
+        self.task_index_key = self._resolve_feature_key(
+            "task_index", self.task_index_key, ("task_index",)
+        )
 
     def _remote_path(self, rel_or_abs_path: str) -> str:
         text = str(rel_or_abs_path)
         if text.startswith("@data/"):
-            relative = Path(text[len("@data/"):])
+            relative = Path(text[len("@data/") :])
             if relative.is_absolute() or ".." in relative.parts:
                 raise ValueError(f"Invalid dataset path: {text!r}")
             return str((Path(self.spec.data_root).expanduser() / relative).resolve())
@@ -1911,7 +2148,12 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
                 continue
             t0 = time.perf_counter()
             raw = local_path.read_bytes()
-            _profile_record("local.read_bytes", time.perf_counter() - t0, bytes=len(raw), path=local_path.name)
+            _profile_record(
+                "local.read_bytes",
+                time.perf_counter() - t0,
+                bytes=len(raw),
+                path=local_path.name,
+            )
             return raw
         raise FileNotFoundError(
             f"Dataset {self.name} local file not found: {rel_path} "
@@ -1945,7 +2187,11 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
         return self._read_decoded_json_with_retries(rel_path, _json_loads)
 
     def load_dataset_stats(self) -> dict[str, Any]:
-        local_stats_path = Path(self.spec.local_stats_path).expanduser() if self.spec.local_stats_path else None
+        local_stats_path = (
+            Path(self.spec.local_stats_path).expanduser()
+            if self.spec.local_stats_path
+            else None
+        )
         local_stats_paths = _local_path_candidates(local_stats_path)
         for candidate in local_stats_paths:
             if _is_file_accessible(candidate):
@@ -1955,7 +2201,9 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
             if self.is_v3:
                 stats = _json_loads(self._read_bytes("meta/stats.json"))
             else:
-                raise FileNotFoundError(f"dataset {self.name} has no stats_path or local_stats_path configured")
+                raise FileNotFoundError(
+                    f"dataset {self.name} has no stats_path or local_stats_path configured"
+                )
         else:
             stats_path = str(self.spec.stats_path)
             if _is_remote_url(stats_path):
@@ -1990,7 +2238,14 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
                         return text
                 return None
             if isinstance(value, dict):
-                for key in ("task", "instruction", "language_instruction", "prompt", "description", "text"):
+                for key in (
+                    "task",
+                    "instruction",
+                    "language_instruction",
+                    "prompt",
+                    "description",
+                    "text",
+                ):
                     text = normalize(value.get(key))
                     if text:
                         return text
@@ -2027,7 +2282,12 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
                 t0 = time.perf_counter()
                 table = pq.read_table(BytesIO(raw))
                 records = table.to_pylist()
-                _profile_record("tasks.read_parquet", time.perf_counter() - t0, records=len(records), bytes=len(raw))
+                _profile_record(
+                    "tasks.read_parquet",
+                    time.perf_counter() - t0,
+                    records=len(records),
+                    bytes=len(raw),
+                )
         else:
             records = self._read_jsonl("meta/tasks.jsonl")
 
@@ -2035,22 +2295,31 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
         out: dict[int, str] = {}
         for item in records:
             if "task_index" not in item:
-                raise KeyError(f"task metadata row missing task_index: keys={list(item)}")
+                raise KeyError(
+                    f"task metadata row missing task_index: keys={list(item)}"
+                )
             task = self._task_text_from_metadata(item)
             task_index = int(item["task_index"])
             if task is None:
                 task = self._fallback_task_text()
             out[task_index] = task
         out = dict(sorted(out.items()))
-        _profile_record("tasks.sort_index", time.perf_counter() - t0, records=len(records))
+        _profile_record(
+            "tasks.sort_index", time.perf_counter() - t0, records=len(records)
+        )
         return out
 
     def _text_embedding_cache_paths(self, prompt: str) -> list[Path]:
         if not self.spec.local_text_embedding_cache_dir:
-            raise ValueError(f"dataset {self.name} has no local_text_embedding_cache_dir configured")
+            raise ValueError(
+                f"dataset {self.name} has no local_text_embedding_cache_dir configured"
+            )
         hashed = hashlib.sha256(prompt.encode("utf-8")).hexdigest()
         filename = f"{hashed}.t5_len{int(self.spec.context_len)}.{self.spec.text_encoder_id}.pt"
-        return [path / filename for path in _local_path_candidates(self.spec.local_text_embedding_cache_dir)]
+        return [
+            path / filename
+            for path in _local_path_candidates(self.spec.local_text_embedding_cache_dir)
+        ]
 
     def _text_embedding_cache_path(self, prompt: str) -> Path:
         paths = self._text_embedding_cache_paths(prompt)
@@ -2075,7 +2344,9 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
                     tasks.append(text)
         return tasks
 
-    def _get_cached_text_context(self, prompt: str) -> tuple[torch.Tensor, torch.Tensor]:
+    def _get_cached_text_context(
+        self, prompt: str
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         cache_path = self._text_embedding_cache_path(prompt)
         if not cache_path.exists():
             raise FileNotFoundError(
@@ -2084,17 +2355,27 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
             )
         t0 = time.perf_counter()
         payload = torch.load(cache_path, map_location="cpu")
-        _profile_record("text_cache.torch_load", time.perf_counter() - t0, path=cache_path.name)
+        _profile_record(
+            "text_cache.torch_load", time.perf_counter() - t0, path=cache_path.name
+        )
         context = payload["context"].clone()
         context_mask = payload["mask"].bool().clone()
         if context.ndim != 2:
-            raise ValueError(f"Cached `context` must be 2D [L, D], got {tuple(context.shape)} in {cache_path}")
+            raise ValueError(
+                f"Cached `context` must be 2D [L, D], got {tuple(context.shape)} in {cache_path}"
+            )
         if context_mask.ndim != 1:
-            raise ValueError(f"Cached `mask` must be 1D [L], got {tuple(context_mask.shape)} in {cache_path}")
+            raise ValueError(
+                f"Cached `mask` must be 1D [L], got {tuple(context_mask.shape)} in {cache_path}"
+            )
         if context.shape[0] != int(self.spec.context_len):
-            raise ValueError(f"Cached context_len mismatch: expected {self.spec.context_len}, got {context.shape[0]} in {cache_path}")
+            raise ValueError(
+                f"Cached context_len mismatch: expected {self.spec.context_len}, got {context.shape[0]} in {cache_path}"
+            )
         if context_mask.shape[0] != int(self.spec.context_len):
-            raise ValueError(f"Cached mask_len mismatch: expected {self.spec.context_len}, got {context_mask.shape[0]} in {cache_path}")
+            raise ValueError(
+                f"Cached mask_len mismatch: expected {self.spec.context_len}, got {context_mask.shape[0]} in {cache_path}"
+            )
         context[~context_mask] = 0.0
         return context, torch.ones_like(context_mask)
 
@@ -2104,8 +2385,13 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
         else:
             records = self._read_jsonl("meta/episodes.jsonl")
         t0 = time.perf_counter()
-        out = {int(item["episode_index"]): item for item in sorted(records, key=lambda x: int(x["episode_index"]))}
-        _profile_record("episodes.sort_index", time.perf_counter() - t0, records=len(records))
+        out = {
+            int(item["episode_index"]): item
+            for item in sorted(records, key=lambda x: int(x["episode_index"]))
+        }
+        _profile_record(
+            "episodes.sort_index", time.perf_counter() - t0, records=len(records)
+        )
         return out
 
     def _read_v3_episode_records(self) -> list[dict[str, Any]]:
@@ -2123,7 +2409,11 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
                 )
             chunk_index = file_ordinal // self.chunks_size
             file_index = file_ordinal % self.chunks_size
-            rel_path = template.format(chunk_index=chunk_index, file_index=file_index, episode_chunk=chunk_index)
+            rel_path = template.format(
+                chunk_index=chunk_index,
+                file_index=file_index,
+                episode_chunk=chunk_index,
+            )
             try:
                 raw = self._read_bytes(rel_path)
             except FileNotFoundError:
@@ -2164,7 +2454,9 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
     def _episode_chunk(self, episode_index: int) -> int:
         return int(episode_index) // self.chunks_size
 
-    def _v3_data_rel_path_for_file_ordinal(self, episode_index: int, file_ordinal: int) -> str:
+    def _v3_data_rel_path_for_file_ordinal(
+        self, episode_index: int, file_ordinal: int
+    ) -> str:
         template = self.info["data_path"]
         file_ordinal = max(0, int(file_ordinal))
         chunk_index = file_ordinal // self.chunks_size
@@ -2180,16 +2472,26 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
         episode = self.episodes_dict[int(episode_index)]
         if "data_from_index" in episode and "data_to_index" in episode:
             return int(episode["data_from_index"]), int(episode["data_to_index"])
-        start = self._scalar(episode.get("dataset_from_index"), episode.get("data/from_index", episode.get("data/from")))
-        end = self._scalar(episode.get("dataset_to_index"), episode.get("data/to_index", episode.get("data/to")))
+        start = self._scalar(
+            episode.get("dataset_from_index"),
+            episode.get("data/from_index", episode.get("data/from")),
+        )
+        end = self._scalar(
+            episode.get("dataset_to_index"),
+            episode.get("data/to_index", episode.get("data/to")),
+        )
         if start is None or end is None:
             return None
         return int(start), int(end)
 
-    def _cache_v3_data_file_range(self, file_ordinal: int, value: tuple[int, int] | None) -> None:
+    def _cache_v3_data_file_range(
+        self, file_ordinal: int, value: tuple[int, int] | None
+    ) -> None:
         self._v3_data_file_range_cache[int(file_ordinal)] = value
         while len(self._v3_data_file_range_cache) > self._v3_data_file_range_cache_max:
-            self._v3_data_file_range_cache.pop(next(iter(self._v3_data_file_range_cache)))
+            self._v3_data_file_range_cache.pop(
+                next(iter(self._v3_data_file_range_cache))
+            )
 
     def _v3_data_file_ordinal_from_episode(self, episode_index: int) -> int:
         episode = self.episodes_dict[int(episode_index)]
@@ -2199,7 +2501,9 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
         file_index = int(self._scalar(episode.get("data/file_index"), 0))
         return chunk_index * self.chunks_size + file_index
 
-    def _v3_data_file_index_range(self, episode_index: int, file_ordinal: int) -> tuple[int, int] | None:
+    def _v3_data_file_index_range(
+        self, episode_index: int, file_ordinal: int
+    ) -> tuple[int, int] | None:
         file_ordinal = int(file_ordinal)
         if file_ordinal in self._v3_data_file_range_cache:
             return self._v3_data_file_range_cache[file_ordinal]
@@ -2222,7 +2526,9 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
         self._cache_v3_data_file_range(file_ordinal, out)
         return out
 
-    def _v3_find_data_rel_path_by_index_range(self, episode_index: int, *, max_scan_files: int = 128) -> str | None:
+    def _v3_find_data_rel_path_by_index_range(
+        self, episode_index: int, *, max_scan_files: int = 128
+    ) -> str | None:
         bounds = self._v3_episode_data_bounds(episode_index)
         if bounds is None:
             return None
@@ -2261,7 +2567,10 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
                 episode_chunk=chunk_index,
                 episode_index=episode_index,
             )
-        return template.format(episode_chunk=self._episode_chunk(episode_index), episode_index=episode_index)
+        return template.format(
+            episode_chunk=self._episode_chunk(episode_index),
+            episode_index=episode_index,
+        )
 
     def _local_data_path(self, rel_or_remote_path: str) -> Path | None:
         root = self._dataset_local_root()
@@ -2291,8 +2600,18 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
         if self.is_v3:
             if episode is None:
                 raise KeyError(f"Missing episode metadata for {episode_index}")
-            chunk_index = int(self._scalar(episode.get(f"videos/{video_key}/chunk_index"), episode.get("video/chunk_index", 0)))
-            file_index = int(self._scalar(episode.get(f"videos/{video_key}/file_index"), episode.get("video/file_index", 0)))
+            chunk_index = int(
+                self._scalar(
+                    episode.get(f"videos/{video_key}/chunk_index"),
+                    episode.get("video/chunk_index", 0),
+                )
+            )
+            file_index = int(
+                self._scalar(
+                    episode.get(f"videos/{video_key}/file_index"),
+                    episode.get("video/file_index", 0),
+                )
+            )
             return template.format(
                 chunk_index=chunk_index,
                 file_index=file_index,
@@ -2334,16 +2653,23 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
         bounds = self._v3_episode_data_bounds(int(episode_index))
         if bounds is not None and "index" in table.column_names:
             start, end = bounds
-            mask = pc.and_(pc.greater_equal(table["index"], int(start)), pc.less(table["index"], int(end)))
+            mask = pc.and_(
+                pc.greater_equal(table["index"], int(start)),
+                pc.less(table["index"], int(end)),
+            )
             episode_table = table.filter(mask)
             if episode_table.num_rows > 0:
                 return episode_table
 
         if "episode_index" in table.column_names:
-            return table.filter(pc.equal(table["episode_index"], int(source_episode_index)))
+            return table.filter(
+                pc.equal(table["episode_index"], int(source_episode_index))
+            )
         return table
 
-    def _load_episode_parquet(self, episode_index: int) -> dict[str, torch.Tensor | list[Any]]:
+    def _load_episode_parquet(
+        self, episode_index: int
+    ) -> dict[str, torch.Tensor | list[Any]]:
         rel_path = self._data_rel_path(episode_index)
 
         def read_episode_table(path: str) -> tuple[Any, int, int]:
@@ -2356,7 +2682,11 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
             parquet_file = pq.ParquetFile(local_path)
             num_bytes = int(local_path.stat().st_size)
             available_columns = set(parquet_file.schema_arrow.names)
-            columns = [col for col in self._needed_parquet_columns() if col in available_columns]
+            columns = [
+                col
+                for col in self._needed_parquet_columns()
+                if col in available_columns
+            ]
             _profile_record(
                 "parquet.open",
                 time.perf_counter() - t0,
@@ -2392,7 +2722,9 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
 
         table, _, _ = read_episode_table(rel_path)
         if table.num_rows == 0 and self.is_v3:
-            resolved_rel_path = self._v3_find_data_rel_path_by_index_range(int(episode_index))
+            resolved_rel_path = self._v3_find_data_rel_path_by_index_range(
+                int(episode_index)
+            )
             if resolved_rel_path and resolved_rel_path != rel_path:
                 rel_path = resolved_rel_path
                 table, _, _ = read_episode_table(rel_path)
@@ -2401,7 +2733,12 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
             raise RuntimeError(f"No rows for episode {episode_index} in {rel_path}")
         t0 = time.perf_counter()
         data = _table_to_tensors(table)
-        _profile_record("parquet.to_tensors", time.perf_counter() - t0, episode=episode_index, rows=table.num_rows)
+        _profile_record(
+            "parquet.to_tensors",
+            time.perf_counter() - t0,
+            episode=episode_index,
+            rows=table.num_rows,
+        )
         return data
 
     def _open_episode_video(
@@ -2420,13 +2757,16 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
             )
         return local_path.open("rb")
 
-    def _episode_video_block_cache(
-        self, episode_index: int, video_key: str
-    ):
+    def _episode_video_block_cache(self, episode_index: int, video_key: str):
         del episode_index, video_key
         return None
 
-    def _episode_task(self, episode_index: int, frame_idx: int, parquet: dict[str, torch.Tensor | list[Any]]) -> tuple[int, str]:
+    def _episode_task(
+        self,
+        episode_index: int,
+        frame_idx: int,
+        parquet: dict[str, torch.Tensor | list[Any]],
+    ) -> tuple[int, str]:
         subtask = self._subtask_for_source_frame(int(episode_index), int(frame_idx))
         if subtask is not None:
             _, _, task = subtask
@@ -2439,11 +2779,15 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
                 task_index = int(self._scalar(value))
                 return task_index, self.tasks[task_index]
             if self.task_index_key in parquet:
-                task_index = int(_select_rows(parquet, self.task_index_key, [frame_idx])[0].item())
+                task_index = int(
+                    _select_rows(parquet, self.task_index_key, [frame_idx])[0].item()
+                )
                 return task_index, self.tasks[task_index]
         else:
             if self.task_index_key in parquet:
-                task_index = int(_select_rows(parquet, self.task_index_key, [frame_idx])[0].item())
+                task_index = int(
+                    _select_rows(parquet, self.task_index_key, [frame_idx])[0].item()
+                )
                 return task_index, self.tasks[task_index]
             value = episode.get("task_index")
             if value is not None:
@@ -2473,7 +2817,11 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
             return float(offsets[video_key])
         if not self.is_v3:
             return 0.0
-        for key in (f"videos/{video_key}/from_timestamp", f"videos/{video_key}/start_timestamp", "from_timestamp"):
+        for key in (
+            f"videos/{video_key}/from_timestamp",
+            f"videos/{video_key}/start_timestamp",
+            "from_timestamp",
+        ):
             value = self._scalar(episode.get(key))
             if value is not None:
                 return float(value)
@@ -2510,13 +2858,9 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
             ]
             timestamps = [idx / float(self.fps) for idx in frame_indices]
         elif "timestamp" in item:
-            timestamps = [
-                float(x) for x in item["timestamp"].reshape(-1).tolist()
-            ]
+            timestamps = [float(x) for x in item["timestamp"].reshape(-1).tolist()]
         else:
-            frame_indices = [
-                int(x) for x in item["frame_index"].reshape(-1).tolist()
-            ]
+            frame_indices = [int(x) for x in item["frame_index"].reshape(-1).tolist()]
             timestamps = [idx / float(self.fps) for idx in frame_indices]
 
         if sample_indices is not None:
@@ -2532,18 +2876,23 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
             timestamps = [offset + ts for ts in timestamps]
         return timestamps
 
-
     def _global_to_episode_frame(self, idx: int) -> tuple[int, int]:
         if idx < 0 or idx >= len(self):
-            raise IndexError(f"index {idx} out of bounds for dataset length {len(self)}")
+            raise IndexError(
+                f"index {idx} out of bounds for dataset length {len(self)}"
+            )
         pos = bisect.bisect_right(self.cumulative_lengths, idx)
         start = 0 if pos == 0 else self.cumulative_lengths[pos - 1]
         return self.selected_episodes[pos], idx - start
 
-    def _query_indices(self, frame_idx: int, episode_len: int, horizon: int) -> tuple[list[int], torch.Tensor]:
+    def _query_indices(
+        self, frame_idx: int, episode_len: int, horizon: int
+    ) -> tuple[list[int], torch.Tensor]:
         raw = [frame_idx + i * self.global_sample_stride for i in range(horizon)]
         clamped = [max(0, min(episode_len - 1, i)) for i in raw]
-        is_pad = torch.as_tensor([i < 0 or i >= episode_len for i in raw], dtype=torch.bool)
+        is_pad = torch.as_tensor(
+            [i < 0 or i >= episode_len for i in raw], dtype=torch.bool
+        )
         return clamped, is_pad
 
     def _query_indices_batch(
@@ -2552,7 +2901,9 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
         episode_len: int,
         horizon: int,
     ) -> tuple[list[int], torch.Tensor]:
-        offsets = torch.arange(int(horizon), dtype=torch.long) * int(self.global_sample_stride)
+        offsets = torch.arange(int(horizon), dtype=torch.long) * int(
+            self.global_sample_stride
+        )
         raw = starts.to(torch.long)[:, None] + offsets[None, :]
         is_pad = (raw < 0) | (raw >= int(episode_len))
         clamped = raw.clamp(min=0, max=max(0, int(episode_len) - 1))
@@ -2565,7 +2916,9 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
         horizon: int,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         steps = torch.arange(int(horizon), dtype=torch.float64)
-        raw = starts.to(torch.float64)[:, None] + steps[None, :] / self.slow_motion_factor
+        raw = (
+            starts.to(torch.float64)[:, None] + steps[None, :] / self.slow_motion_factor
+        )
         is_pad = (raw < 0.0) | (raw > float(segment_end - 1))
         clamped = raw.clamp(min=0.0, max=float(segment_end - 1))
         lower = torch.floor(clamped).to(torch.long)
@@ -2653,22 +3006,27 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
 
         first_local = lower[:, : self.action_size]
         second_local = lower[:, 1 : self.action_size + 1]
-        action, action_dim_is_pad, action_mask = self._project_retimed_canonical_actions(
-            parquet,
-            episode_index,
-            first_local.reshape(-1),
-            second_local.reshape(-1),
-            alpha[:, : self.action_size].reshape(-1),
-            alpha[:, 1 : self.action_size + 1].reshape(-1),
-            state[:, : self.action_size].reshape(-1, state.shape[-1]),
-            state[:, 1 : self.action_size + 1].reshape(-1, state.shape[-1]),
-            state_mask[:, : self.action_size].reshape(-1, state_mask.shape[-1]),
-            state_mask[:, 1 : self.action_size + 1].reshape(-1, state_mask.shape[-1]),
+        action, action_dim_is_pad, action_mask = (
+            self._project_retimed_canonical_actions(
+                parquet,
+                episode_index,
+                first_local.reshape(-1),
+                second_local.reshape(-1),
+                alpha[:, : self.action_size].reshape(-1),
+                alpha[:, 1 : self.action_size + 1].reshape(-1),
+                state[:, : self.action_size].reshape(-1, state.shape[-1]),
+                state[:, 1 : self.action_size + 1].reshape(-1, state.shape[-1]),
+                state_mask[:, : self.action_size].reshape(-1, state_mask.shape[-1]),
+                state_mask[:, 1 : self.action_size + 1].reshape(
+                    -1, state_mask.shape[-1]
+                ),
+            )
         )
         action = action.reshape(num_windows, self.action_size, -1)
         action_mask = action_mask.reshape(num_windows, self.action_size, -1)
-        action_pad = state_pad[:, : self.action_size] | state_pad[:, 1 : self.action_size + 1]
-
+        action_pad = (
+            state_pad[:, : self.action_size] | state_pad[:, 1 : self.action_size + 1]
+        )
 
         return {
             "source_times": source_times,
@@ -2700,7 +3058,9 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
         future = _select_rows(
             parquet, key, self.source_frame_indices(episode_index, upper)
         )
-        if not isinstance(current, torch.Tensor) or not isinstance(future, torch.Tensor):
+        if not isinstance(current, torch.Tensor) or not isinstance(
+            future, torch.Tensor
+        ):
             raise TypeError(f"Column {key!r} must be numeric for slow motion.")
         blend = alpha.to(torch.float64)
         while blend.ndim < current.ndim:
@@ -2735,12 +3095,14 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
                 return_counts=True,
             )
             state_alpha = alpha[0].index_select(0, unique_state[:, 2])
-            state, state_dim_is_pad, state_mask = self._project_retimed_canonical_states(
-                parquet,
-                episode_index,
-                unique_state[:, 0],
-                unique_state[:, 1],
-                state_alpha,
+            state, state_dim_is_pad, state_mask = (
+                self._project_retimed_canonical_states(
+                    parquet,
+                    episode_index,
+                    unique_state[:, 0],
+                    unique_state[:, 1],
+                    state_alpha,
+                )
             )
             state_time_is_pad = ~torch.isfinite(state).all(dim=-1)
             state = torch.nan_to_num(state)
@@ -2759,7 +3121,9 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
 
         first_local = lower[:, : self.action_size]
         second_local = lower[:, 1 : self.action_size + 1]
-        action_pad = state_pad[:, : self.action_size] | state_pad[:, 1 : self.action_size + 1]
+        action_pad = (
+            state_pad[:, : self.action_size] | state_pad[:, 1 : self.action_size + 1]
+        )
 
         action_steps = torch.arange(self.action_size, dtype=torch.long)
         action_steps = action_steps[None, :].expand(num_windows, -1)
@@ -2790,17 +3154,19 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
             end_upper,
             alpha_end,
         )
-        action, action_dim_is_pad, action_mask = self._project_retimed_canonical_actions(
-            parquet,
-            episode_index,
-            unique_action[:, 0],
-            unique_action[:, 1],
-            alpha_start,
-            alpha_end,
-            start_state,
-            end_state,
-            start_state_mask,
-            end_state_mask,
+        action, action_dim_is_pad, action_mask = (
+            self._project_retimed_canonical_actions(
+                parquet,
+                episode_index,
+                unique_action[:, 0],
+                unique_action[:, 1],
+                alpha_start,
+                alpha_end,
+                start_state,
+                end_state,
+                start_state_mask,
+                end_state_mask,
+            )
         )
 
         action_time_is_pad = ~torch.isfinite(action).all(dim=-1).cpu()
@@ -2843,13 +3209,19 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
         key = component.get(f"{kind}_key") or component.get("key")
         if not key:
             return None
-        value = _select_feature(parquet, str(key), indices, _component_raw_slice(component, kind))
+        value = _select_feature(
+            parquet, str(key), indices, _component_raw_slice(component, kind)
+        )
         scale = component.get(f"{kind}_scale")
         offset = component.get(f"{kind}_offset")
         if scale is not None:
-            value = value * torch.as_tensor(scale, dtype=value.dtype, device=value.device)
+            value = value * torch.as_tensor(
+                scale, dtype=value.dtype, device=value.device
+            )
         if offset is not None:
-            value = value + torch.as_tensor(offset, dtype=value.dtype, device=value.device)
+            value = value + torch.as_tensor(
+                offset, dtype=value.dtype, device=value.device
+            )
         return value
 
     def _canonical_pose_input(self, component: dict[str, Any], kind: str) -> str:
@@ -2857,12 +3229,18 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
             component.get(f"{kind}_pose_input")
             or component.get("pose_input")
             or self.canonical_adapter.get(f"{kind}_pose_input")
-            or (self.canonical_adapter.get("action_pose_input") if kind == "action" else None)
+            or (
+                self.canonical_adapter.get("action_pose_input")
+                if kind == "action"
+                else None
+            )
             or self.canonical_adapter.get("pose_input")
             or "xyz_rotvec"
         )
 
-    def _canonical_frame_transform(self, component: dict[str, Any], kind: str) -> dict[str, Any]:
+    def _canonical_frame_transform(
+        self, component: dict[str, Any], kind: str
+    ) -> dict[str, Any]:
         return _merge_frame_transform(self.canonical_adapter, component, kind)
 
     def _canonical_transform_pose(
@@ -2875,7 +3253,9 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
         is_delta: bool | None = None,
     ) -> torch.Tensor:
         if is_delta is None:
-            is_delta = _pose_is_delta(kind, pose_input, self.canonical_adapter, component)
+            is_delta = _pose_is_delta(
+                kind, pose_input, self.canonical_adapter, component
+            )
         return _transform_xyz_rotvec_pose(
             pose,
             self._canonical_frame_transform(component, kind),
@@ -2909,7 +3289,9 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
         direct = self._canonical_component_tensor(parquet, component, indices, kind)
         if direct is not None:
             pose = _pose_to_xyz_rotvec(direct, pose_input)
-            return self._canonical_transform_pose(pose, component, kind, pose_input, is_delta=False)
+            return self._canonical_transform_pose(
+                pose, component, kind, pose_input, is_delta=False
+            )
 
         pos_key = component.get(f"{kind}_position_key") or component.get("position_key")
         rot_key = (
@@ -2921,7 +3303,9 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
         if not pos_key or not rot_key:
             return None
 
-        pos_slice = component.get(f"{kind}_position_slice") or component.get("position_slice")
+        pos_slice = component.get(f"{kind}_position_slice") or component.get(
+            "position_slice"
+        )
         rot_slice = (
             component.get(f"{kind}_rotation_slice")
             or component.get(f"{kind}_orientation_slice")
@@ -2931,15 +3315,25 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
         pos = _select_feature(parquet, str(pos_key), indices, pos_slice)
         rot = _select_feature(parquet, str(rot_key), indices, rot_slice)
         if pos.shape[-1] != 3:
-            raise ValueError(f"Canonical ee position expects 3 dims from {pos_key!r}, got {pos.shape[-1]}")
+            raise ValueError(
+                f"Canonical ee position expects 3 dims from {pos_key!r}, got {pos.shape[-1]}"
+            )
         if rot.shape[-1] == 4:
-            rotvec = _quat_to_rotvec_xyzw(rot) if "xyzw" in pose_input else _quat_to_rotvec_wxyz(rot)
+            rotvec = (
+                _quat_to_rotvec_xyzw(rot)
+                if "xyzw" in pose_input
+                else _quat_to_rotvec_wxyz(rot)
+            )
         elif rot.shape[-1] == 3:
             rotvec = _rpy_to_rotvec(rot)
         else:
-            raise ValueError(f"Canonical ee rotation expects 3 or 4 dims from {rot_key!r}, got {rot.shape[-1]}")
+            raise ValueError(
+                f"Canonical ee rotation expects 3 or 4 dims from {rot_key!r}, got {rot.shape[-1]}"
+            )
         pose = torch.cat([pos, rotvec], dim=-1)
-        return self._canonical_transform_pose(pose, component, kind, pose_input, is_delta=False)
+        return self._canonical_transform_pose(
+            pose, component, kind, pose_input, is_delta=False
+        )
 
     def _canonical_pose_from_component(
         self,
@@ -2955,53 +3349,97 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
         selected_indices = indices
         if kind == "action" and component.get("action_from_next_action"):
             if next_indices is None:
-                raise ValueError(f"canonical_adapter for {self.name} uses action_from_next_action without next_indices")
+                raise ValueError(
+                    f"canonical_adapter for {self.name} uses action_from_next_action without next_indices"
+                )
             selected_indices = next_indices
 
         if kind == "action":
-            if (
-                regenerate_state_delta_common
-                and _uses_state_delta_common(self.canonical_adapter, component)
+            if regenerate_state_delta_common and _uses_state_delta_common(
+                self.canonical_adapter, component
             ):
                 if next_indices is None:
                     raise ValueError(
                         f"canonical_adapter for {self.name} uses "
                         "state_delta_common without next_indices"
                     )
-                current_pose = self._canonical_absolute_pose_from_component(parquet, component, indices, "state")
-                future_pose = self._canonical_absolute_pose_from_component(parquet, component, next_indices, "state")
+                current_pose = self._canonical_absolute_pose_from_component(
+                    parquet, component, indices, "state"
+                )
+                future_pose = self._canonical_absolute_pose_from_component(
+                    parquet, component, next_indices, "state"
+                )
                 if current_pose is None or future_pose is None:
                     return None
-                pose = _pose_delta_world_from_transformed_xyz_rotvec(current_pose, future_pose)
-                return _format_xyz_rotvec_pose(pose, _pose_output_format(kind, self.canonical_adapter, component))
+                pose = _pose_delta_world_from_transformed_xyz_rotvec(
+                    current_pose, future_pose
+                )
+                return _format_xyz_rotvec_pose(
+                    pose, _pose_output_format(kind, self.canonical_adapter, component)
+                )
 
             semantic = _pose_semantics(kind, self.canonical_adapter, component)
             if semantic in {"absolute", "absolute_target", "target", "target_pose"}:
-                current_pose = self._canonical_absolute_pose_from_component(parquet, component, indices, "state")
-                target_pose = self._canonical_absolute_pose_from_component(parquet, component, selected_indices, "action")
+                current_pose = self._canonical_absolute_pose_from_component(
+                    parquet, component, indices, "state"
+                )
+                target_pose = self._canonical_absolute_pose_from_component(
+                    parquet, component, selected_indices, "action"
+                )
                 if current_pose is None or target_pose is None:
                     return None
-                pose = _pose_delta_world_from_transformed_xyz_rotvec(current_pose, target_pose)
-                return _format_xyz_rotvec_pose(pose, _pose_output_format(kind, self.canonical_adapter, component))
+                pose = _pose_delta_world_from_transformed_xyz_rotvec(
+                    current_pose, target_pose
+                )
+                return _format_xyz_rotvec_pose(
+                    pose, _pose_output_format(kind, self.canonical_adapter, component)
+                )
 
             state_delta_key = component.get("state_delta_key")
             if state_delta_key:
                 if next_indices is None:
-                    raise ValueError(f"canonical_adapter for {self.name} uses state_delta_key without next_indices")
-                current = _select_feature(parquet, str(state_delta_key), indices, _component_raw_slice(component, "state"))
-                future = _select_feature(parquet, str(state_delta_key), next_indices, _component_raw_slice(component, "state"))
+                    raise ValueError(
+                        f"canonical_adapter for {self.name} uses state_delta_key without next_indices"
+                    )
+                current = _select_feature(
+                    parquet,
+                    str(state_delta_key),
+                    indices,
+                    _component_raw_slice(component, "state"),
+                )
+                future = _select_feature(
+                    parquet,
+                    str(state_delta_key),
+                    next_indices,
+                    _component_raw_slice(component, "state"),
+                )
                 pose = _pose_delta_xyz_rotvec(current, future, pose_input)
-                pose = self._canonical_transform_pose(pose, component, kind, pose_input, is_delta=True)
-                return _format_xyz_rotvec_pose(pose, _pose_output_format(kind, self.canonical_adapter, component))
+                pose = self._canonical_transform_pose(
+                    pose, component, kind, pose_input, is_delta=True
+                )
+                return _format_xyz_rotvec_pose(
+                    pose, _pose_output_format(kind, self.canonical_adapter, component)
+                )
 
             state_future_key = component.get("state_future_key")
             if state_future_key:
                 if next_indices is None:
-                    raise ValueError(f"canonical_adapter for {self.name} uses state_future_key without next_indices")
-                future = _select_feature(parquet, str(state_future_key), next_indices, _component_raw_slice(component, "state"))
+                    raise ValueError(
+                        f"canonical_adapter for {self.name} uses state_future_key without next_indices"
+                    )
+                future = _select_feature(
+                    parquet,
+                    str(state_future_key),
+                    next_indices,
+                    _component_raw_slice(component, "state"),
+                )
                 pose = _pose_to_xyz_rotvec(future, pose_input)
-                pose = self._canonical_transform_pose(pose, component, kind, pose_input, is_delta=False)
-                return _format_xyz_rotvec_pose(pose, _pose_output_format(kind, self.canonical_adapter, component))
+                pose = self._canonical_transform_pose(
+                    pose, component, kind, pose_input, is_delta=False
+                )
+                return _format_xyz_rotvec_pose(
+                    pose, _pose_output_format(kind, self.canonical_adapter, component)
+                )
 
         if isinstance(component.get("fk"), dict):
             pose = self._canonical_absolute_pose_from_component(
@@ -3017,11 +3455,15 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
                 _pose_output_format(kind, self.canonical_adapter, component),
             )
 
-        direct = self._canonical_component_tensor(parquet, component, selected_indices, kind)
+        direct = self._canonical_component_tensor(
+            parquet, component, selected_indices, kind
+        )
         if direct is not None:
             pose = _pose_to_xyz_rotvec(direct, pose_input)
             pose = self._canonical_transform_pose(pose, component, kind, pose_input)
-            return _format_xyz_rotvec_pose(pose, _pose_output_format(kind, self.canonical_adapter, component))
+            return _format_xyz_rotvec_pose(
+                pose, _pose_output_format(kind, self.canonical_adapter, component)
+            )
 
         pos_key = component.get(f"{kind}_position_key") or component.get("position_key")
         rot_key = (
@@ -3033,7 +3475,9 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
         if not pos_key or not rot_key:
             return None
 
-        pos_slice = component.get(f"{kind}_position_slice") or component.get("position_slice")
+        pos_slice = component.get(f"{kind}_position_slice") or component.get(
+            "position_slice"
+        )
         rot_slice = (
             component.get(f"{kind}_rotation_slice")
             or component.get(f"{kind}_orientation_slice")
@@ -3043,17 +3487,29 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
         pos = _select_feature(parquet, str(pos_key), selected_indices, pos_slice)
         rot = _select_feature(parquet, str(rot_key), selected_indices, rot_slice)
         if pos.shape[-1] != 3:
-            raise ValueError(f"Canonical ee position expects 3 dims from {pos_key!r}, got {pos.shape[-1]}")
+            raise ValueError(
+                f"Canonical ee position expects 3 dims from {pos_key!r}, got {pos.shape[-1]}"
+            )
         if rot.shape[-1] == 4:
-            pose_input = str(self.canonical_adapter.get("pose_input") or "split_xyz_xyzw")
-            rotvec = _quat_to_rotvec_xyzw(rot) if "xyzw" in pose_input else _quat_to_rotvec_wxyz(rot)
+            pose_input = str(
+                self.canonical_adapter.get("pose_input") or "split_xyz_xyzw"
+            )
+            rotvec = (
+                _quat_to_rotvec_xyzw(rot)
+                if "xyzw" in pose_input
+                else _quat_to_rotvec_wxyz(rot)
+            )
         elif rot.shape[-1] == 3:
             rotvec = _rpy_to_rotvec(rot)
         else:
-            raise ValueError(f"Canonical ee rotation expects 3 or 4 dims from {rot_key!r}, got {rot.shape[-1]}")
+            raise ValueError(
+                f"Canonical ee rotation expects 3 or 4 dims from {rot_key!r}, got {rot.shape[-1]}"
+            )
         pose = torch.cat([pos, rotvec], dim=-1)
         pose = self._canonical_transform_pose(pose, component, kind, pose_input)
-        return _format_xyz_rotvec_pose(pose, _pose_output_format(kind, self.canonical_adapter, component))
+        return _format_xyz_rotvec_pose(
+            pose, _pose_output_format(kind, self.canonical_adapter, component)
+        )
 
     def _canonical_project(
         self,
@@ -3080,9 +3536,7 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
             gripper = slot.get("gripper")
             if gripper is None:
                 continue
-            target_slice = (
-                gripper.get("action_target_slice") or gripper["target_slice"]
-            )
+            target_slice = gripper.get("action_target_slice") or gripper["target_slice"]
             start, end = map(int, target_slice)
             weight[start:end] = self.spec.action_gripper_loss_weight
         return weight
@@ -3098,7 +3552,9 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
         regenerate_state_delta_common: bool = True,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor | None]:
         if not self.use_canonical_adapter:
-            raise RuntimeError("canonical projection requested without canonical_adapter")
+            raise RuntimeError(
+                "canonical projection requested without canonical_adapter"
+            )
         dim = int(self.canonical_dim)
         out = torch.zeros((len(indices), dim), dtype=torch.float32)
         dim_mask = torch.ones(dim, dtype=torch.bool)
@@ -3110,8 +3566,7 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
         has_exact_validity = any(
             isinstance(component, dict)
             and bool(
-                component.get(f"{kind}_validity_key")
-                or component.get("validity_key")
+                component.get(f"{kind}_validity_key") or component.get("validity_key")
             )
             for slot_cfg in slots.values()
             if isinstance(slot_cfg, dict)
@@ -3137,7 +3592,9 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
                     continue
                 if component.get(f"{kind}_enabled", True) is False:
                     continue
-                target_slice = component.get(f"{kind}_target_slice") or component.get("target_slice")
+                target_slice = component.get(f"{kind}_target_slice") or component.get(
+                    "target_slice"
+                )
                 if target_slice is None:
                     continue
                 if component_name == "ee":
@@ -3147,20 +3604,28 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
                         indices,
                         kind,
                         next_indices,
-                        regenerate_state_delta_common=(
-                            regenerate_state_delta_common
-                        ),
+                        regenerate_state_delta_common=(regenerate_state_delta_common),
                     )
                 elif kind == "action" and component.get("action_from_next_state"):
                     if next_indices is None:
-                        raise ValueError(f"canonical_adapter for {self.name} uses action_from_next_state without next_indices")
-                    values = self._canonical_component_tensor(parquet, component, next_indices, "state")
+                        raise ValueError(
+                            f"canonical_adapter for {self.name} uses action_from_next_state without next_indices"
+                        )
+                    values = self._canonical_component_tensor(
+                        parquet, component, next_indices, "state"
+                    )
                 elif kind == "action" and component.get("action_from_next_action"):
                     if next_indices is None:
-                        raise ValueError(f"canonical_adapter for {self.name} uses action_from_next_action without next_indices")
-                    values = self._canonical_component_tensor(parquet, component, next_indices, "action")
+                        raise ValueError(
+                            f"canonical_adapter for {self.name} uses action_from_next_action without next_indices"
+                        )
+                    values = self._canonical_component_tensor(
+                        parquet, component, next_indices, "action"
+                    )
                 else:
-                    values = self._canonical_component_tensor(parquet, component, indices, kind)
+                    values = self._canonical_component_tensor(
+                        parquet, component, indices, kind
+                    )
                 if values is None:
                     continue
                 _assign_target(out, dim_mask, target_slice, values)
@@ -3197,11 +3662,9 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
         validity = exact_validity if has_exact_validity else None
         if (
             kind == "action"
-            and str(
-                self.canonical_adapter.get(
-                    "action_pose_semantics", "stored_delta"
-                )
-            ).strip().lower()
+            and str(self.canonical_adapter.get("action_pose_semantics", "stored_delta"))
+            .strip()
+            .lower()
             == "state_delta_common"
             and regenerate_state_delta_common
         ):
@@ -3210,8 +3673,8 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
                     f"Dataset {self.name} state_delta_common action semantics "
                     "requires next_indices."
                 )
-            start_state, _, start_state_validity = self._canonical_project_with_validity(
-                parquet, indices, "state"
+            start_state, _, start_state_validity = (
+                self._canonical_project_with_validity(parquet, indices, "state")
             )
             end_state, _, end_state_validity = self._canonical_project_with_validity(
                 parquet, next_indices, "state"
@@ -3230,18 +3693,18 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
             and getattr(
                 self,
                 "action_translation_frame",
-                str(
-                    self.canonical_adapter.get(
-                        "action_translation_frame", "source"
-                    )
-                ).strip().lower(),
+                str(self.canonical_adapter.get("action_translation_frame", "source"))
+                .strip()
+                .lower(),
             )
             == "start_observation_common"
         ):
-            start_state, _, start_state_validity = self._canonical_project_with_validity(
-                parquet,
-                indices,
-                "state",
+            start_state, _, start_state_validity = (
+                self._canonical_project_with_validity(
+                    parquet,
+                    indices,
+                    "state",
+                )
             )
             out, validity = self._convert_wrist_action_translation(
                 out,
@@ -3295,7 +3758,9 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
         cache[cache_key] = counts
         return counts
 
-    def max_start_for_trajectory_pos(self, trajectory_pos: int, allow_padding_at_end: bool = False) -> int:
+    def max_start_for_trajectory_pos(
+        self, trajectory_pos: int, allow_padding_at_end: bool = False
+    ) -> int:
         if not self.subtask_action_segments:
             length = int(self.trajectory_lengths[int(trajectory_pos)])
             if allow_padding_at_end:
@@ -3310,7 +3775,9 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
         )
         return max((end for _, end in intervals), default=-1)
 
-    def get_episode_data(self, selected_episode_pos: int) -> dict[str, torch.Tensor | list[Any]]:
+    def get_episode_data(
+        self, selected_episode_pos: int
+    ) -> dict[str, torch.Tensor | list[Any]]:
         episode_index = self.selected_episodes[selected_episode_pos]
         return self._load_episode_parquet(episode_index)
 
@@ -3353,9 +3820,7 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
             action_dim_is_pad = retimed["action_dim_is_pad"]
             state_mask = retimed["state_mask"][0]
             action_mask = retimed["action_mask"][0]
-            nearest_local = torch.floor(retimed["source_times"][0] + 0.5).to(
-                torch.long
-            )
+            nearest_local = torch.floor(retimed["source_times"][0] + 0.5).to(torch.long)
             source_state_indices = self.source_frame_indices(
                 episode_index, nearest_local
             )
@@ -3366,8 +3831,12 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
             action_indices, action_pad = self._query_indices(
                 frame_idx, segment_end, self.action_size
             )
-            source_state_indices = self.source_frame_indices(episode_index, state_indices)
-            source_action_indices = self.source_frame_indices(episode_index, action_indices)
+            source_state_indices = self.source_frame_indices(
+                episode_index, state_indices
+            )
+            source_action_indices = self.source_frame_indices(
+                episode_index, action_indices
+            )
             action_next_raw_indices = [
                 idx + self.global_sample_stride for idx in action_indices
             ]
@@ -3378,23 +3847,37 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
             action_next_local_indices = [
                 min(segment_end - 1, idx) for idx in action_next_raw_indices
             ]
-            source_action_next_indices = self.source_frame_indices(episode_index, action_next_local_indices)
+            source_action_next_indices = self.source_frame_indices(
+                episode_index, action_next_local_indices
+            )
 
             action_pad = action_pad | action_next_pad
 
             if self.use_canonical_adapter:
-                state, state_dim_is_pad, state_mask = self._canonical_project_with_validity(
-                    parquet, source_state_indices, "state"
+                state, state_dim_is_pad, state_mask = (
+                    self._canonical_project_with_validity(
+                        parquet, source_state_indices, "state"
+                    )
                 )
-                action, action_dim_is_pad, action_mask = self._canonical_project_with_validity(
-                    parquet,
-                    source_action_indices,
-                    "action",
-                    source_action_next_indices,
+                action, action_dim_is_pad, action_mask = (
+                    self._canonical_project_with_validity(
+                        parquet,
+                        source_action_indices,
+                        "action",
+                        source_action_next_indices,
+                    )
                 )
             else:
-                state, state_dim_is_pad = _pad_last_dim(_select_rows_concat(parquet, self.state_keys, source_state_indices), self.state_target_dim)
-                action, action_dim_is_pad = _pad_last_dim(_select_rows_concat(parquet, self.action_keys, source_action_indices), self.action_target_dim)
+                state, state_dim_is_pad = _pad_last_dim(
+                    _select_rows_concat(parquet, self.state_keys, source_state_indices),
+                    self.state_target_dim,
+                )
+                action, action_dim_is_pad = _pad_last_dim(
+                    _select_rows_concat(
+                        parquet, self.action_keys, source_action_indices
+                    ),
+                    self.action_target_dim,
+                )
                 state_mask = None
                 action_mask = None
 
@@ -3421,8 +3904,12 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
             "canonical_action_layout": self.canonical_adapter.get("layout", ""),
             "episode_index": torch.tensor(episode_index, dtype=torch.long),
             "sample_frame_index": torch.tensor(frame_idx, dtype=torch.long),
-            "source_episode_index": torch.tensor(self.source_episode_index(episode_index), dtype=torch.long),
-            "source_frame_index": torch.tensor(self.source_frame_index(episode_index, frame_idx), dtype=torch.long),
+            "source_episode_index": torch.tensor(
+                self.source_episode_index(episode_index), dtype=torch.long
+            ),
+            "source_frame_index": torch.tensor(
+                self.source_frame_index(episode_index, frame_idx), dtype=torch.long
+            ),
             "observation.state": state,
             "action": action,
             "observation.state_is_pad": state_pad,
@@ -3434,9 +3921,7 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
             self.spec.action_loss_weight != 1.0
             or self.spec.action_gripper_loss_weight != 1.0
         ):
-            item["action_dim_loss_weight"] = (
-                self._action_dimension_loss_weight()
-            )
+            item["action_dim_loss_weight"] = self._action_dimension_loss_weight()
         if self.spec.action_loss_weight != 1.0:
             item["action_loss_weight"] = torch.tensor(
                 self.spec.action_loss_weight, dtype=torch.float32
@@ -3449,7 +3934,9 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
             item["action_mask"] = action_mask
         if self.timestamp_key in parquet:
             if retimed is None:
-                item["timestamp"] = _select_rows(parquet, self.timestamp_key, source_state_indices)
+                item["timestamp"] = _select_rows(
+                    parquet, self.timestamp_key, source_state_indices
+                )
             else:
                 item["timestamp"] = self._interpolate_parquet_column(
                     parquet,
@@ -3460,14 +3947,20 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
                     retimed["alpha"][0],
                 )
         if self.frame_index_key in parquet:
-            item["frame_index"] = _select_rows(parquet, self.frame_index_key, source_state_indices)
-        else:
-            item["frame_index"] = torch.as_tensor(source_state_indices, dtype=torch.long)
-        if retimed is not None:
-            item["retimed_frame_index"] = (
-                retimed["source_times"][0] + float(episode_start)
+            item["frame_index"] = _select_rows(
+                parquet, self.frame_index_key, source_state_indices
             )
-        task_index, task = self._episode_task(episode_index, self.source_frame_index(episode_index, frame_idx), parquet)
+        else:
+            item["frame_index"] = torch.as_tensor(
+                source_state_indices, dtype=torch.long
+            )
+        if retimed is not None:
+            item["retimed_frame_index"] = retimed["source_times"][0] + float(
+                episode_start
+            )
+        task_index, task = self._episode_task(
+            episode_index, self.source_frame_index(episode_index, frame_idx), parquet
+        )
         item["task_index"] = torch.tensor(task_index, dtype=torch.long)
         item["task"] = task
         prompt = self.prompt_template.format(task=task)
@@ -3507,7 +4000,9 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
         episode_meta_len = int(self.episodes_dict[int(episode_index)]["length"])
         parquet = self._load_episode_parquet(int(episode_index))
         episode_start = self.episode_start_frame(int(episode_index))
-        episode_len = min(episode_meta_len, max(0, _parquet_num_rows(parquet) - episode_start))
+        episode_len = min(
+            episode_meta_len, max(0, _parquet_num_rows(parquet) - episode_start)
+        )
         if episode_len <= 0:
             raise RuntimeError(f"Episode {episode_index} has no readable rows.")
 
@@ -3556,7 +4051,9 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
                         "action": retimed_stats["action"],
                         "observation.state_is_pad": retimed_stats["state_is_pad"],
                         "action_is_pad": retimed_stats["action_is_pad"],
-                        "observation.state_dim_is_pad": retimed_stats["state_dim_is_pad"],
+                        "observation.state_dim_is_pad": retimed_stats[
+                            "state_dim_is_pad"
+                        ],
                         "action_dim_is_pad": retimed_stats["action_dim_is_pad"],
                         "observation.state_mask": retimed_stats["state_mask"],
                         "action_mask": retimed_stats["action_mask"],
@@ -3572,18 +4069,22 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
                 action_indices, action_pad = self._query_indices_batch(
                     starts, segment_end, self.action_size
                 )
-                source_state_indices = self.source_frame_indices(int(episode_index), state_indices)
-                source_action_indices = self.source_frame_indices(int(episode_index), action_indices)
-                action_next_raw = torch.as_tensor(
-                    action_indices, dtype=torch.long
-                ).add(int(self.global_sample_stride))
-                action_next_pad = action_next_raw.ge(segment_end).reshape_as(
-                    action_pad
+                source_state_indices = self.source_frame_indices(
+                    int(episode_index), state_indices
                 )
+                source_action_indices = self.source_frame_indices(
+                    int(episode_index), action_indices
+                )
+                action_next_raw = torch.as_tensor(action_indices, dtype=torch.long).add(
+                    int(self.global_sample_stride)
+                )
+                action_next_pad = action_next_raw.ge(segment_end).reshape_as(action_pad)
                 action_next_indices = action_next_raw.clamp(
                     max=segment_end - 1
                 ).tolist()
-                source_action_next_indices = self.source_frame_indices(int(episode_index), action_next_indices)
+                source_action_next_indices = self.source_frame_indices(
+                    int(episode_index), action_next_indices
+                )
                 action_pad = action_pad | action_next_pad
 
                 if self.use_canonical_adapter:
@@ -3595,20 +4096,28 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
                     # expanded window stream without doing ~16x redundant EEF
                     # rotation conversions.
                     state_source = np.asarray(source_state_indices, dtype=np.int64)
-                    state_valid = ~state_pad.reshape(-1).detach().cpu().numpy().astype(bool)
+                    state_valid = (
+                        ~state_pad.reshape(-1).detach().cpu().numpy().astype(bool)
+                    )
                     unique_state, state_weights = np.unique(
                         state_source[state_valid],
                         return_counts=True,
                     )
-                    state, state_dim_is_pad, state_mask = self._canonical_project_with_validity(
-                        parquet,
-                        unique_state.tolist(),
-                        "state",
+                    state, state_dim_is_pad, state_mask = (
+                        self._canonical_project_with_validity(
+                            parquet,
+                            unique_state.tolist(),
+                            "state",
+                        )
                     )
 
                     action_source = np.asarray(source_action_indices, dtype=np.int64)
-                    action_next_source = np.asarray(source_action_next_indices, dtype=np.int64)
-                    action_valid = ~action_pad.reshape(-1).detach().cpu().numpy().astype(bool)
+                    action_next_source = np.asarray(
+                        source_action_next_indices, dtype=np.int64
+                    )
+                    action_valid = (
+                        ~action_pad.reshape(-1).detach().cpu().numpy().astype(bool)
+                    )
                     action_pairs = np.stack(
                         [action_source[action_valid], action_next_source[action_valid]],
                         axis=1,
@@ -3618,27 +4127,39 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
                         axis=0,
                         return_counts=True,
                     )
-                    action, action_dim_is_pad, action_mask = self._canonical_project_with_validity(
-                        parquet,
-                        unique_action_pairs[:, 0].tolist(),
-                        "action",
-                        unique_action_pairs[:, 1].tolist(),
+                    action, action_dim_is_pad, action_mask = (
+                        self._canonical_project_with_validity(
+                            parquet,
+                            unique_action_pairs[:, 0].tolist(),
+                            "action",
+                            unique_action_pairs[:, 1].tolist(),
+                        )
                     )
                     state_row_weights = torch.as_tensor(state_weights, dtype=torch.long)
-                    action_row_weights = torch.as_tensor(action_weights, dtype=torch.long)
-                    state_time_is_pad = torch.zeros(len(state_weights), dtype=torch.bool)
+                    action_row_weights = torch.as_tensor(
+                        action_weights, dtype=torch.long
+                    )
+                    state_time_is_pad = torch.zeros(
+                        len(state_weights), dtype=torch.bool
+                    )
 
                     action_time_is_pad = ~torch.isfinite(action).all(dim=-1).cpu()
                 else:
                     state_flat, state_dim_is_pad = _pad_last_dim(
-                        _select_rows_concat(parquet, self.state_keys, source_state_indices),
+                        _select_rows_concat(
+                            parquet, self.state_keys, source_state_indices
+                        ),
                         self.state_target_dim,
                     )
                     action_flat, action_dim_is_pad = _pad_last_dim(
-                        _select_rows_concat(parquet, self.action_keys, source_action_indices),
+                        _select_rows_concat(
+                            parquet, self.action_keys, source_action_indices
+                        ),
                         self.action_target_dim,
                     )
-                    state = state_flat.reshape(num_windows, self.num_frames_per_sample, -1)
+                    state = state_flat.reshape(
+                        num_windows, self.num_frames_per_sample, -1
+                    )
                     action = action_flat.reshape(num_windows, self.action_size, -1)
                     state_row_weights = None
                     action_row_weights = None
@@ -3650,7 +4171,9 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
                 batch = {
                     "dataset_name": self.name,
                     "stats_group": self.spec.stats_group or self.name,
-                    "episode_index": torch.full((num_windows,), int(episode_index), dtype=torch.long),
+                    "episode_index": torch.full(
+                        (num_windows,), int(episode_index), dtype=torch.long
+                    ),
                     "sample_frame_index": starts,
                     "observation.state": state,
                     "action": action,
@@ -3682,12 +4205,9 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
             raise RuntimeError("dataset has no video keys")
         video_key = video_key or self.video_key or self.video_keys[0]
         episode_index = int(item["episode_index"].item())
-        timestamps = self.resolve_video_timestamps(
-            item, video_key, sample_indices
-        )
+        timestamps = self.resolve_video_timestamps(item, video_key, sample_indices)
         with self._open_episode_video(episode_index, video_key) as source:
             return _decode_mp4_lerobot(source, timestamps, fps=self.fps)
-
 
     def _project_retimed_wrist_states(
         self,
@@ -3765,17 +4285,15 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
         alpha_end_column = alpha_end[:, None].to(action.dtype)
 
         slots = self.canonical_adapter["slots"]
-        action_pose_semantics = str(
-            self.canonical_adapter.get("action_pose_semantics", "stored_delta")
-        ).strip().lower()
+        action_pose_semantics = (
+            str(self.canonical_adapter.get("action_pose_semantics", "stored_delta"))
+            .strip()
+            .lower()
+        )
         for slot in slots.values():
             pose = slot["pose"]
-            state_pose_start, state_pose_end = map(
-                int, pose["state_target_slice"]
-            )
-            action_pose_start, action_pose_end = map(
-                int, pose["action_target_slice"]
-            )
+            state_pose_start, state_pose_end = map(int, pose["state_target_slice"])
+            action_pose_start, action_pose_end = map(int, pose["action_target_slice"])
             if action_pose_semantics == "state_delta_common":
                 current_pose = _xyz_rot6d_to_xyz_rotvec(
                     start_state[:, state_pose_start:state_pose_end]
@@ -3803,10 +4321,9 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
                     f"Dataset {self.name} has unsupported action_pose_semantics="
                     f"{action_pose_semantics!r}."
                 )
-            pose_valid = (
-                start_state_mask[:, state_pose_start:state_pose_end].all(dim=-1)
-                & end_state_mask[:, state_pose_start:state_pose_end].all(dim=-1)
-            )
+            pose_valid = start_state_mask[:, state_pose_start:state_pose_end].all(
+                dim=-1
+            ) & end_state_mask[:, state_pose_start:state_pose_end].all(dim=-1)
             action_mask[:, action_pose_start:action_pose_end] &= pose_valid[:, None]
 
             gripper = slot["gripper"]
@@ -3819,11 +4336,16 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
             action[:, action_gripper_start:action_gripper_end] = end_state[
                 :, state_gripper_start:state_gripper_end
             ]
-            gripper_valid = (
-                start_state_mask[:, state_gripper_start:state_gripper_end].all(dim=-1)
-                & end_state_mask[:, state_gripper_start:state_gripper_end].all(dim=-1)
+            gripper_valid = start_state_mask[
+                :, state_gripper_start:state_gripper_end
+            ].all(dim=-1) & end_state_mask[
+                :, state_gripper_start:state_gripper_end
+            ].all(
+                dim=-1
             )
-            action_mask[:, action_gripper_start:action_gripper_end] &= gripper_valid[:, None]
+            action_mask[:, action_gripper_start:action_gripper_end] &= gripper_valid[
+                :, None
+            ]
 
         if action_pose_semantics == "stored_delta":
             action, action_mask = self._convert_wrist_action_translation(
@@ -3853,9 +4375,7 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
         future, _, future_mask = self._canonical_project_with_validity(
             parquet, source_upper, "state"
         )
-        structural_mask = (~state_dim_is_pad).unsqueeze(0).expand(
-            current.shape[0], -1
-        )
+        structural_mask = (~state_dim_is_pad).unsqueeze(0).expand(current.shape[0], -1)
         if current_mask is None:
             current_mask = structural_mask
         if future_mask is None:
@@ -3867,9 +4387,7 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
             pose = slot.get("pose") or slot.get("ee")
             if not isinstance(pose, dict) or pose.get("pad") is True:
                 continue
-            target_slice = pose.get("state_target_slice") or pose.get(
-                "target_slice"
-            )
+            target_slice = pose.get("state_target_slice") or pose.get("target_slice")
             if target_slice is None:
                 continue
             start, end = map(int, target_slice)
@@ -3914,9 +4432,7 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
             convert_wrist_action_translation=False,
             regenerate_state_delta_common=False,
         )
-        structural_mask = (~action_dim_is_pad).unsqueeze(0).expand(
-            first.shape[0], -1
-        )
+        structural_mask = (~action_dim_is_pad).unsqueeze(0).expand(first.shape[0], -1)
         if first_mask is None:
             first_mask = structural_mask
         if second_mask is None:
@@ -3979,10 +4495,9 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
                             crosses,
                         )
                     )
-                pose_valid = (
-                    start_state_mask[:, state_pose_start:state_pose_end].all(dim=-1)
-                    & end_state_mask[:, state_pose_start:state_pose_end].all(dim=-1)
-                )
+                pose_valid = start_state_mask[:, state_pose_start:state_pose_end].all(
+                    dim=-1
+                ) & end_state_mask[:, state_pose_start:state_pose_end].all(dim=-1)
                 action_mask[:, action_pose_start:action_pose_end] &= pose_valid[:, None]
 
             for component_name in ("joint", "gripper"):
@@ -4005,10 +4520,9 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
                         f"{slot_name!r} has mismatched state/action widths."
                     )
                 action[:, action_start:action_end] = end_state[:, state_start:state_end]
-                component_valid = (
-                    start_state_mask[:, state_start:state_end].all(dim=-1)
-                    & end_state_mask[:, state_start:state_end].all(dim=-1)
-                )
+                component_valid = start_state_mask[:, state_start:state_end].all(
+                    dim=-1
+                ) & end_state_mask[:, state_start:state_end].all(dim=-1)
                 action_mask[:, action_start:action_end] &= component_valid[:, None]
 
         return action, action_dim_is_pad, action_mask
@@ -4053,23 +4567,18 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
             current_pose = _xyz_rot6d_to_xyz_rotvec(
                 start_state[:, state_start:state_end]
             )
-            future_pose = _xyz_rot6d_to_xyz_rotvec(
-                end_state[:, state_start:state_end]
-            )
+            future_pose = _xyz_rot6d_to_xyz_rotvec(end_state[:, state_start:state_end])
             converted[:, action_start:action_end] = (
-                _pose_delta_world_from_transformed_xyz_rotvec(
-                    current_pose, future_pose
-                )
+                _pose_delta_world_from_transformed_xyz_rotvec(current_pose, future_pose)
             )
             if (
                 converted_validity is not None
                 and start_state_validity is not None
                 and end_state_validity is not None
             ):
-                pose_valid = (
-                    start_state_validity[:, state_start:state_end].all(dim=-1)
-                    & end_state_validity[:, state_start:state_end].all(dim=-1)
-                )
+                pose_valid = start_state_validity[:, state_start:state_end].all(
+                    dim=-1
+                ) & end_state_validity[:, state_start:state_end].all(dim=-1)
                 converted_validity[:, action_start:action_end] &= pose_valid[:, None]
         return converted, converted_validity
 
@@ -4085,9 +4594,9 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
         action_translation_frame = getattr(
             self,
             "action_translation_frame",
-            str(
-                self.canonical_adapter.get("action_translation_frame", "source")
-            ).strip().lower(),
+            str(self.canonical_adapter.get("action_translation_frame", "source"))
+            .strip()
+            .lower(),
         )
         if action_translation_frame != "start_observation_common":
             return action, action_validity
@@ -4123,9 +4632,7 @@ class PretrainLeRobotDataset(torch.utils.data.Dataset):
                 start_state[:, state_start:state_end],
             )
             if converted_validity is not None and start_state_validity is not None:
-                pose_valid = start_state_validity[:, state_start:state_end].all(
-                    dim=-1
-                )
+                pose_valid = start_state_validity[:, state_start:state_end].all(dim=-1)
                 converted_validity[:, action_start:action_end] &= pose_valid[:, None]
         return converted, converted_validity
 
@@ -4145,8 +4652,12 @@ def _distributed_dataset_weights(
     allow_padding_at_end: bool = False,
 ) -> list[float]:
     weights = [float(spec.dataset_weight) for spec in specs]
-    valid_lengths = [int(ds.valid_start_counts(allow_padding_at_end).sum()) for ds in datasets]
-    for group_id in sorted({spec.group_id for spec in specs if spec.distribute_weights}):
+    valid_lengths = [
+        int(ds.valid_start_counts(allow_padding_at_end).sum()) for ds in datasets
+    ]
+    for group_id in sorted(
+        {spec.group_id for spec in specs if spec.distribute_weights}
+    ):
         indices = [i for i, spec in enumerate(specs) if spec.group_id == group_id]
         total_len = sum(valid_lengths[i] for i in indices)
         if total_len <= 0:
@@ -4167,9 +4678,11 @@ def _mixture_dataset_weights(
     mode = str(mixture_cfg.get("dataset_weight_mode", "configured")).strip().lower()
     if mode in {"valid_start_count", "valid_window_count"}:
         return [
-            float(_dataset_valid_start_count(ds, allow_padding_at_end))
-            if float(spec.dataset_weight) > 0
-            else 0.0
+            (
+                float(_dataset_valid_start_count(ds, allow_padding_at_end))
+                if float(spec.dataset_weight) > 0
+                else 0.0
+            )
             for spec, ds in zip(specs, datasets)
         ]
     if mode in {
@@ -4184,8 +4697,7 @@ def _mixture_dataset_weights(
                 f"dataset_weight_mode={mode!r}"
             )
         family_weights = {
-            str(name): float(weight)
-            for name, weight in raw_family_weights.items()
+            str(name): float(weight) for name, weight in raw_family_weights.items()
         }
         if any(weight < 0 for weight in family_weights.values()) or not any(
             weight > 0 for weight in family_weights.values()
@@ -4197,9 +4709,11 @@ def _mixture_dataset_weights(
 
         valid_lengths = np.asarray(
             [
-                _dataset_valid_start_count(ds, allow_padding_at_end)
-                if float(spec.dataset_weight) > 0
-                else 0
+                (
+                    _dataset_valid_start_count(ds, allow_padding_at_end)
+                    if float(spec.dataset_weight) > 0
+                    else 0
+                )
                 for spec, ds in zip(specs, datasets)
             ],
             dtype=np.float64,
@@ -4213,8 +4727,7 @@ def _mixture_dataset_weights(
             raise ValueError("mixture.family_groups must be a mapping")
         if mode != "family_grouped" and raw_family_groups:
             raise ValueError(
-                "mixture.family_groups requires "
-                "dataset_weight_mode='family_grouped'"
+                "mixture.family_groups requires " "dataset_weight_mode='family_grouped'"
             )
 
         for family, family_weight in family_weights.items():
@@ -4245,8 +4758,7 @@ def _mixture_dataset_weights(
                 continue
             if not isinstance(family_groups, dict) or not family_groups:
                 raise ValueError(
-                    f"mixture.family_groups[{family!r}] must be a non-empty "
-                    "mapping"
+                    f"mixture.family_groups[{family!r}] must be a non-empty " "mapping"
                 )
 
             family_names = {specs[int(idx)].name: int(idx) for idx in indices}
@@ -4256,7 +4768,12 @@ def _mixture_dataset_weights(
                 )
             # Retain quality-group ratios among the explicitly selected datasets.
             family_groups = {
-                name: dict(group, datasets=[n for n in group.get("datasets", []) if n in family_names])
+                name: dict(
+                    group,
+                    datasets=[
+                        n for n in group.get("datasets", []) if n in family_names
+                    ],
+                )
                 for name, group in family_groups.items()
                 if isinstance(group, dict)
                 and any(n in family_names for n in group.get("datasets", []))
@@ -4311,15 +4828,17 @@ def _mixture_dataset_weights(
                         f"multiple groups: {duplicate_names}"
                     )
                 grouped_indices.update(int(idx) for idx in group_indices)
-                allocation = str(
-                    group_cfg.get("allocation", "valid_start_count")
-                ).strip().lower()
+                allocation = (
+                    str(group_cfg.get("allocation", "valid_start_count"))
+                    .strip()
+                    .lower()
+                )
                 if allocation in {"valid_start_count", "valid_window_count"}:
                     allocation_weights = valid_lengths[group_indices]
                 elif allocation in {"uniform", "equal"}:
-                    allocation_weights = (
-                        valid_lengths[group_indices] > 0
-                    ).astype(np.float64)
+                    allocation_weights = (valid_lengths[group_indices] > 0).astype(
+                        np.float64
+                    )
                 else:
                     raise ValueError(
                         f"Unsupported allocation={allocation!r} for mixture "
@@ -4375,8 +4894,10 @@ def _mixture_dataset_weights(
         allow_padding_at_end=allow_padding_at_end,
     )
 
+
 def _read_yaml_or_json(path: Path) -> Any:
     from omegaconf import OmegaConf
+
     return OmegaConf.to_container(OmegaConf.load(path), resolve=True)
 
 
@@ -4388,13 +4909,17 @@ def _resolve_include_path(path: str | Path, config_dir: Path) -> Path:
 
 
 def _merge_config_includes(payload: dict[str, Any], config_dir: Path) -> dict[str, Any]:
-    projection_files = payload.get("projection_files", payload.get("projection_file", []))
+    projection_files = payload.get(
+        "projection_files", payload.get("projection_file", [])
+    )
     if projection_files in (None, ""):
         projection_files = []
     if isinstance(projection_files, (str, Path)):
         projection_files = [projection_files]
     if not isinstance(projection_files, list):
-        raise TypeError("projection_file/projection_files must be a path or list of paths")
+        raise TypeError(
+            "projection_file/projection_files must be a path or list of paths"
+        )
 
     for include in projection_files:
         include_path = _resolve_include_path(include, config_dir)
@@ -4436,7 +4961,9 @@ def _merge_config_includes(payload: dict[str, Any], config_dir: Path) -> dict[st
     ego_cfg = payload.get("ego_data", {}) or {}
     if isinstance(ego_cfg, dict):
         ego_enabled = bool(ego_cfg.get("enabled", True))
-        ego_source_names = {str(name) for name in ego_cfg.get("source_files", ["egodex"])}
+        ego_source_names = {
+            str(name) for name in ego_cfg.get("source_files", ["egodex"])
+        }
     else:
         ego_enabled = bool(ego_cfg)
         ego_source_names = {"egodex"}
@@ -4467,11 +4994,15 @@ def _merge_config_includes(payload: dict[str, Any], config_dir: Path) -> dict[st
                     include = value
             elif isinstance(value, dict):
                 enabled = bool(value.get("enabled", True))
-                include = str(value.get("path", value.get("file", value.get("include", include))))
+                include = str(
+                    value.get("path", value.get("file", value.get("include", include)))
+                )
             elif value is None:
                 enabled = False
             else:
-                raise TypeError(f"Unsupported source_files.{name!s} value type: {type(value).__name__}")
+                raise TypeError(
+                    f"Unsupported source_files.{name!s} value type: {type(value).__name__}"
+                )
             if not enabled:
                 continue
             if "/" not in include and not Path(include).suffix:
@@ -4494,7 +5025,9 @@ def _merge_config_includes(payload: dict[str, Any], config_dir: Path) -> dict[st
                 item = dict(item)
                 item.setdefault("_source_file", source_file)
                 if isinstance(fragment, dict) and fragment.get("normalization_stats"):
-                    item.setdefault("normalization_stats", fragment["normalization_stats"])
+                    item.setdefault(
+                        "normalization_stats", fragment["normalization_stats"]
+                    )
             return item
 
         if isinstance(fragment, dict) and isinstance(fragment.get("sources"), list):
@@ -4511,7 +5044,9 @@ def _merge_config_includes(payload: dict[str, Any], config_dir: Path) -> dict[st
     return payload
 
 
-def _read_dataset_config(path: Path | None, _parents: tuple[Path, ...] = ()) -> dict[str, Any]:
+def _read_dataset_config(
+    path: Path | None, _parents: tuple[Path, ...] = ()
+) -> dict[str, Any]:
     if path is None:
         return {}
 
@@ -4523,12 +5058,17 @@ def _read_dataset_config(path: Path | None, _parents: tuple[Path, ...] = ()) -> 
         return {}
     config_dir = path.parent
     parent = payload.pop("extends", None)
-    base = {} if parent is None else _read_dataset_config(
-        _resolve_include_path(parent, config_dir), (*_parents, path)
+    base = (
+        {}
+        if parent is None
+        else _read_dataset_config(
+            _resolve_include_path(parent, config_dir), (*_parents, path)
+        )
     )
     payload = _merge_config_includes(payload, config_dir)
     if base:
         from omegaconf import OmegaConf
+
         payload = OmegaConf.to_container(OmegaConf.merge(base, payload), resolve=True)
     payload["_config_dir"] = str(config_dir)
     for key, env in (("data_root", "WAM_DATA_ROOT"), ("cache_root", "WAM_CACHE_ROOT")):
@@ -4544,8 +5084,14 @@ def _get_nested(config: dict[str, Any], section: str, key: str, default: Any) ->
     return default
 
 
-def _resolved_arg(args_value: Any, config: dict[str, Any], section: str, key: str, default: Any) -> Any:
-    return args_value if args_value is not None else _get_nested(config, section, key, default)
+def _resolved_arg(
+    args_value: Any, config: dict[str, Any], section: str, key: str, default: Any
+) -> Any:
+    return (
+        args_value
+        if args_value is not None
+        else _get_nested(config, section, key, default)
+    )
 
 
 def _optional_str(value: Any, default: str | None = None) -> str | None:
@@ -4571,7 +5117,9 @@ def _path_segments_for_group(value: str) -> list[str]:
     return [part for part in text.replace("\\", "/").split("/") if part]
 
 
-def _infer_stats_group(remote_root: str, dataset_name: str, embodiment: str, control_schema: str | None) -> str:
+def _infer_stats_group(
+    remote_root: str, dataset_name: str, embodiment: str, control_schema: str | None
+) -> str:
     segments = _path_segments_for_group(remote_root)
     lowered = [part.lower() for part in segments]
     remote_text = "/".join(lowered)
@@ -4588,10 +5136,10 @@ def _infer_stats_group(remote_root: str, dataset_name: str, embodiment: str, con
     if "galaxea" in lowered:
         return "galaxea/r1lite"
 
-
     emb = _safe_name(embodiment or "unknown")
     schema = _safe_name(control_schema or "")
     return f"{emb}/{schema}" if schema else emb
+
 
 def _make_spec(
     item: dict[str, Any] | str,
@@ -4605,12 +5153,18 @@ def _make_spec(
     if isinstance(item, str):
         item = {"dir": item}
 
-    remotes = inherited.get("_remotes", {}) if isinstance(inherited.get("_remotes"), dict) else {}
+    remotes = (
+        inherited.get("_remotes", {})
+        if isinstance(inherited.get("_remotes"), dict)
+        else {}
+    )
     remote_name = str(item.get("remote") or inherited.get("remote") or "")
     remote_base = item.get("remote_base", inherited.get("remote_base"))
     if not remote_base and remote_name:
         if remote_name not in remotes:
-            raise KeyError(f"Unknown remote alias {remote_name!r}; available={sorted(remotes)}")
+            raise KeyError(
+                f"Unknown remote alias {remote_name!r}; available={sorted(remotes)}"
+            )
         remote_base = remotes[remote_name]
 
     base_path = str(item.get("base_path", inherited.get("base_path", ""))).strip("/")
@@ -4626,25 +5180,54 @@ def _make_spec(
             parts.append(rel_path)
         remote_root = path_join(parts[0], *parts[1:])
     if not remote_root:
-        raise KeyError(f"dataset spec {idx} is missing remote_root or remote/base_path/dir")
-    remote_root = _resolve_local_dataset_root(str(remote_root), inherited.get("data_root"))
+        raise KeyError(
+            f"dataset spec {idx} is missing remote_root or remote/base_path/dir"
+        )
+    remote_root = _resolve_local_dataset_root(
+        str(remote_root), inherited.get("data_root")
+    )
 
     dataset_path = "/".join(part for part in (base_path, rel_path) if part)
-    dataset_name = str(item.get("name") or _safe_name(dataset_path or str(remote_root).rstrip('/').rsplit('/', 1)[-1]) or f"dataset_{idx}")
-    embodiment = str(item.get("adapter") or item.get("embodiment") or inherited.get("adapter") or inherited.get("embodiment") or "default")
+    dataset_name = str(
+        item.get("name")
+        or _safe_name(dataset_path or str(remote_root).rstrip('/').rsplit('/', 1)[-1])
+        or f"dataset_{idx}"
+    )
+    embodiment = str(
+        item.get("adapter")
+        or item.get("embodiment")
+        or inherited.get("adapter")
+        or inherited.get("embodiment")
+        or "default"
+    )
 
-    stats_value = item.get("stats_path", inherited.get("stats_path", "dataset_stats.json"))
+    stats_value = item.get(
+        "stats_path", inherited.get("stats_path", "dataset_stats.json")
+    )
     local_stats_value = item.get("local_stats_path", inherited.get("local_stats_path"))
     path_index_value = item.get("path_index_dir", inherited.get("path_index_dir"))
     local_text_cache_value = item.get(
         "local_text_embedding_cache_dir",
-        item.get("text_embedding_cache_dir", inherited.get("local_text_embedding_cache_dir", inherited.get("text_embedding_cache_dir"))),
+        item.get(
+            "text_embedding_cache_dir",
+            inherited.get(
+                "local_text_embedding_cache_dir",
+                inherited.get("text_embedding_cache_dir"),
+            ),
+        ),
     )
 
-    source_name = item.get("source_name") or inherited.get("source_name") or inherited.get("_source_file") or remote_name
+    source_name = (
+        item.get("source_name")
+        or inherited.get("source_name")
+        or inherited.get("_source_file")
+        or remote_name
+    )
     relative_remote = _relative_remote_cache_path(str(remote_root))
     cache_root = str(
-        inherited.get("cache_root") or os.environ.get("WAM_CACHE_ROOT") or DEFAULT_CACHE_ROOT
+        inherited.get("cache_root")
+        or os.environ.get("WAM_CACHE_ROOT")
+        or DEFAULT_CACHE_ROOT
     ).rstrip("/")
     local_stats_value = local_stats_value or _format_template(
         inherited.get("local_stats_path_template"),
@@ -4677,20 +5260,32 @@ def _make_spec(
         cache_root=cache_root,
     )
 
-    dataset_weight = float(item.get("dataset_weight", inherited.get("dataset_weight", 1.0)))
-    distribute_weights = bool(item.get("distribute_weights", inherited.get("distribute_weights", False)))
+    dataset_weight = float(
+        item.get("dataset_weight", inherited.get("dataset_weight", 1.0))
+    )
+    distribute_weights = bool(
+        item.get("distribute_weights", inherited.get("distribute_weights", False))
+    )
     dataset_override = _lookup_weight_override(
         inherited.get("dataset_weight_overrides"),
         [dataset_name, dataset_path, rel_path, remote_root],
     )
-    dataset_weight, distribute_weights = _apply_weight_override(dataset_weight, distribute_weights, dataset_override)
+    dataset_weight, distribute_weights = _apply_weight_override(
+        dataset_weight, distribute_weights, dataset_override
+    )
 
     modalities = _merge_mapping(inherited.get("modalities"), item.get("modalities"))
-    control_schema = _optional_str(item.get("control_schema", inherited.get("control_schema")))
-    stats_group_template = item.get("stats_group_template", inherited.get("stats_group_template"))
+    control_schema = _optional_str(
+        item.get("control_schema", inherited.get("control_schema"))
+    )
+    stats_group_template = item.get(
+        "stats_group_template", inherited.get("stats_group_template")
+    )
     stats_group = item.get("stats_group", inherited.get("stats_group"))
     if not stats_group and stats_group_template:
-        body = _infer_stats_group(str(remote_root), dataset_name, embodiment, control_schema).split("/", 1)[-1]
+        body = _infer_stats_group(
+            str(remote_root), dataset_name, embodiment, control_schema
+        ).split("/", 1)[-1]
         stats_group = _format_template(
             stats_group_template,
             name=dataset_name,
@@ -4704,7 +5299,9 @@ def _make_spec(
             control_schema=control_schema or "",
         )
     if not stats_group:
-        stats_group = _infer_stats_group(str(remote_root), dataset_name, embodiment, control_schema)
+        stats_group = _infer_stats_group(
+            str(remote_root), dataset_name, embodiment, control_schema
+        )
 
     return DatasetSpec(
         name=dataset_name,
@@ -4712,24 +5309,49 @@ def _make_spec(
         stats_path=_optional_str(stats_value),
         local_stats_path=_optional_str(local_stats_value),
         path_index_dir=_optional_str(path_index_value),
-        data_root=str(inherited.get("data_root") or os.environ.get("WAM_DATA_ROOT", "data")),
-        require_path_index=bool(item.get("require_path_index", inherited.get("require_path_index", False))),
-        local_data_dir=_optional_str(item.get("local_data_dir", inherited.get("local_data_dir"))),
+        data_root=str(
+            inherited.get("data_root") or os.environ.get("WAM_DATA_ROOT", "data")
+        ),
+        require_path_index=bool(
+            item.get("require_path_index", inherited.get("require_path_index", False))
+        ),
+        local_data_dir=_optional_str(
+            item.get("local_data_dir", inherited.get("local_data_dir"))
+        ),
         local_text_embedding_cache_dir=_optional_str(local_text_cache_value),
         context_len=int(item.get("context_len", inherited.get("context_len", 128))),
-        text_encoder_id=str(item.get("text_encoder_id", inherited.get("text_encoder_id", "wan22ti2v5b"))),
-        prompt_template=str(item.get("prompt_template", inherited.get("prompt_template", DEFAULT_PROMPT))),
-        task_index_authority=str(item.get("task_index_authority", inherited.get("task_index_authority", "parquet"))),
-        slow_motion_factor=float(item.get("slow_motion_factor", inherited.get("slow_motion_factor", 1.0))),
+        text_encoder_id=str(
+            item.get("text_encoder_id", inherited.get("text_encoder_id", "wan22ti2v5b"))
+        ),
+        prompt_template=str(
+            item.get(
+                "prompt_template", inherited.get("prompt_template", DEFAULT_PROMPT)
+            )
+        ),
+        task_index_authority=str(
+            item.get(
+                "task_index_authority", inherited.get("task_index_authority", "parquet")
+            )
+        ),
+        slow_motion_factor=float(
+            item.get("slow_motion_factor", inherited.get("slow_motion_factor", 1.0))
+        ),
         action_loss_weight=float(
             item.get(
                 "action_loss_weight",
                 inherited.get("action_loss_weight", 1.0),
             )
         ),
-        sampling_family=item.get("sampling_family", inherited.get("sampling_family", None)),
-        allow_padding_at_end=item.get("allow_padding_at_end", inherited.get("allow_padding_at_end", None)),
-        action_loss_normalization=item.get("action_loss_normalization", inherited.get("action_loss_normalization", "legacy_per_sample")),
+        sampling_family=item.get(
+            "sampling_family", inherited.get("sampling_family", None)
+        ),
+        allow_padding_at_end=item.get(
+            "allow_padding_at_end", inherited.get("allow_padding_at_end", None)
+        ),
+        action_loss_normalization=item.get(
+            "action_loss_normalization",
+            inherited.get("action_loss_normalization", "legacy_per_sample"),
+        ),
         action_gripper_loss_weight=float(
             item.get(
                 "action_gripper_loss_weight",
@@ -4737,17 +5359,32 @@ def _make_spec(
             )
         ),
         modalities=modalities,
-        canonical_adapter=_merge_mapping(inherited.get("canonical_adapter"), item.get("canonical_adapter")),
-        format_version=_parse_format_major(item.get("format_version", item.get("format", inherited.get("format_version", inherited.get("format"))))),
+        canonical_adapter=_merge_mapping(
+            inherited.get("canonical_adapter"), item.get("canonical_adapter")
+        ),
+        format_version=_parse_format_major(
+            item.get(
+                "format_version",
+                item.get(
+                    "format", inherited.get("format_version", inherited.get("format"))
+                ),
+            )
+        ),
         embodiment=embodiment,
         control_schema=control_schema,
         stats_group=_optional_str(stats_group),
-        normalization_stats=_optional_str(item.get("normalization_stats", inherited.get("normalization_stats"))),
+        normalization_stats=_optional_str(
+            item.get("normalization_stats", inherited.get("normalization_stats"))
+        ),
         source_name=_optional_str(source_name),
         dataset_weight=dataset_weight,
         distribute_weights=distribute_weights,
-        action_target_dim=item.get("action_target_dim", inherited.get("action_target_dim")),
-        state_target_dim=item.get("state_target_dim", inherited.get("state_target_dim")),
+        action_target_dim=item.get(
+            "action_target_dim", inherited.get("action_target_dim")
+        ),
+        state_target_dim=item.get(
+            "state_target_dim", inherited.get("state_target_dim")
+        ),
         group_id=int(group_id),
     )
 
@@ -4759,7 +5396,9 @@ def _resolve_config_path(path: str | Path, config_dir: str | None) -> Path:
     return out
 
 
-def _read_dataset_entries_file(path: str | Path, config_dir: str | None) -> list[dict[str, Any] | str]:
+def _read_dataset_entries_file(
+    path: str | Path, config_dir: str | None
+) -> list[dict[str, Any] | str]:
     file_path = _resolve_config_path(path, config_dir)
     if not file_path.exists():
         raise FileNotFoundError(file_path)
@@ -4772,7 +5411,9 @@ def _read_dataset_entries_file(path: str | Path, config_dir: str | None) -> list
 
             payload = yaml.safe_load(file_path.read_text(encoding="utf-8"))
         if isinstance(payload, dict):
-            payload = payload.get("datasets", payload.get("paths", payload.get("items")))
+            payload = payload.get(
+                "datasets", payload.get("paths", payload.get("items"))
+            )
         if not isinstance(payload, list):
             raise TypeError(f"Dataset list file must contain a list: {file_path}")
         return payload
@@ -4786,14 +5427,18 @@ def _read_dataset_entries_file(path: str | Path, config_dir: str | None) -> list
     return entries
 
 
-def _dataset_entries_from_group(group: dict[str, Any], config_dir: str | None, data_root: str | None = None) -> list[dict[str, Any] | str]:
+def _dataset_entries_from_group(
+    group: dict[str, Any], config_dir: str | None, data_root: str | None = None
+) -> list[dict[str, Any] | str]:
     entries: list[dict[str, Any] | str] = []
     files = group.get("datasets_files", group.get("datasets_file"))
     if files is not None:
         if isinstance(files, (str, Path)):
             files = [files]
         if not isinstance(files, list):
-            raise TypeError("datasets_file/datasets_files must be a path or list of paths")
+            raise TypeError(
+                "datasets_file/datasets_files must be a path or list of paths"
+            )
         for file_path in files:
             entries.extend(_read_dataset_entries_file(file_path, config_dir))
 
@@ -4806,30 +5451,66 @@ def _dataset_entries_from_group(group: dict[str, Any], config_dir: str | None, d
     pattern = group.get("datasets_glob")
     if pattern:
         root = Path(_resolve_local_dataset_root(group["root"], data_root))
-        matches = sorted(path for path in root.glob(str(pattern)) if (path / "meta/info.json").is_file())
+        matches = sorted(
+            path
+            for path in root.glob(str(pattern))
+            if (path / "meta/info.json").is_file()
+        )
         if not matches:
-            raise FileNotFoundError(f"No local LeRobot datasets match {root / str(pattern)}")
+            raise FileNotFoundError(
+                f"No local LeRobot datasets match {root / str(pattern)}"
+            )
         for path in matches:
             relative = path.relative_to(root).as_posix()
-            name = str(group["name"]) if relative == "." else str(group["name"]) + "__" + _safe_name(relative)
+            name = (
+                str(group["name"])
+                if relative == "."
+                else str(group["name"]) + "__" + _safe_name(relative)
+            )
             entries.append({"name": name, "root": str(path.resolve())})
     return entries or [group]
 
 
-def _flatten_mixture_specs(args: argparse.Namespace, config: dict[str, Any]) -> list[DatasetSpec] | None:
+def _flatten_mixture_specs(
+    args: argparse.Namespace, config: dict[str, Any]
+) -> list[DatasetSpec] | None:
     mixture = config.get("mixture")
     if not isinstance(mixture, dict) or not isinstance(mixture.get("specs"), list):
         return None
 
-    remotes = config.get("remotes", {}) if isinstance(config.get("remotes"), dict) else {}
-    cache_templates = config.get("cache_templates", {}) if isinstance(config.get("cache_templates"), dict) else {}
-    dataset_defaults = config.get("dataset_defaults", {}) if isinstance(config.get("dataset_defaults"), dict) else {}
-    weight_config = config.get("dataset_weights", {}) if isinstance(config.get("dataset_weights"), dict) else {}
-    default_dataset_weight = float(dataset_defaults.get("dataset_weight", config.get("dataset_weight", 1.0)))
-    default_distribute_weights = bool(dataset_defaults.get("distribute_weights", config.get("distribute_weights", False)))
+    remotes = (
+        config.get("remotes", {}) if isinstance(config.get("remotes"), dict) else {}
+    )
+    cache_templates = (
+        config.get("cache_templates", {})
+        if isinstance(config.get("cache_templates"), dict)
+        else {}
+    )
+    dataset_defaults = (
+        config.get("dataset_defaults", {})
+        if isinstance(config.get("dataset_defaults"), dict)
+        else {}
+    )
+    weight_config = (
+        config.get("dataset_weights", {})
+        if isinstance(config.get("dataset_weights"), dict)
+        else {}
+    )
+    default_dataset_weight = float(
+        dataset_defaults.get("dataset_weight", config.get("dataset_weight", 1.0))
+    )
+    default_distribute_weights = bool(
+        dataset_defaults.get(
+            "distribute_weights", config.get("distribute_weights", False)
+        )
+    )
     default_canonical_adapter = dataset_defaults.get("canonical_adapter")
-    source_weight_overrides = weight_config.get("sources", {}) if isinstance(weight_config, dict) else {}
-    dataset_weight_overrides = weight_config.get("datasets", {}) if isinstance(weight_config, dict) else {}
+    source_weight_overrides = (
+        weight_config.get("sources", {}) if isinstance(weight_config, dict) else {}
+    )
+    dataset_weight_overrides = (
+        weight_config.get("datasets", {}) if isinstance(weight_config, dict) else {}
+    )
     config_dir = config.get("_config_dir")
 
     specs: list[DatasetSpec] = []
@@ -4846,17 +5527,27 @@ def _flatten_mixture_specs(args: argparse.Namespace, config: dict[str, Any]) -> 
             "remote": group.get("remote"),
             "remote_base": group.get("remote_base"),
             "base_path": group.get("base_path", ""),
-            "data_root": config.get("data_root") or os.environ.get("WAM_DATA_ROOT", DEFAULT_DATA_ROOT),
-            "cache_root": config.get("cache_root") or os.environ.get("WAM_CACHE_ROOT", DEFAULT_CACHE_ROOT),
+            "data_root": config.get("data_root")
+            or os.environ.get("WAM_DATA_ROOT", DEFAULT_DATA_ROOT),
+            "cache_root": config.get("cache_root")
+            or os.environ.get("WAM_CACHE_ROOT", DEFAULT_CACHE_ROOT),
             "stats_path": group.get("stats_path", "dataset_stats.json"),
             "local_stats_path": group.get("local_stats_path"),
             "normalization_stats": group.get("normalization_stats"),
             "path_index_dir": group.get("path_index_dir"),
-            "require_path_index": group.get("require_path_index", dataset_defaults.get("require_path_index", False)),
+            "require_path_index": group.get(
+                "require_path_index", dataset_defaults.get("require_path_index", False)
+            ),
             "local_data_dir": group.get("local_data_dir"),
-            "local_text_embedding_cache_dir": group.get("local_text_embedding_cache_dir", group.get("text_embedding_cache_dir")),
-            "path_index_dir_template": group.get("path_index_dir_template", cache_templates.get("path_index_dir")),
-            "local_stats_path_template": group.get("local_stats_path_template", cache_templates.get("local_stats_path")),
+            "local_text_embedding_cache_dir": group.get(
+                "local_text_embedding_cache_dir", group.get("text_embedding_cache_dir")
+            ),
+            "path_index_dir_template": group.get(
+                "path_index_dir_template", cache_templates.get("path_index_dir")
+            ),
+            "local_stats_path_template": group.get(
+                "local_stats_path_template", cache_templates.get("local_stats_path")
+            ),
             "local_text_embedding_cache_dir_template": group.get(
                 "local_text_embedding_cache_dir_template",
                 cache_templates.get("local_text_embedding_cache_dir"),
@@ -4877,9 +5568,17 @@ def _flatten_mixture_specs(args: argparse.Namespace, config: dict[str, Any]) -> 
                 "action_gripper_loss_weight",
                 dataset_defaults.get("action_gripper_loss_weight", 1.0),
             ),
-            "sampling_family": group.get("sampling_family", dataset_defaults.get("sampling_family", None)),
-            "allow_padding_at_end": group.get("allow_padding_at_end", dataset_defaults.get("allow_padding_at_end", None)),
-            "action_loss_normalization": group.get("action_loss_normalization", dataset_defaults.get("action_loss_normalization", "legacy_per_sample")),
+            "sampling_family": group.get(
+                "sampling_family", dataset_defaults.get("sampling_family", None)
+            ),
+            "allow_padding_at_end": group.get(
+                "allow_padding_at_end",
+                dataset_defaults.get("allow_padding_at_end", None),
+            ),
+            "action_loss_normalization": group.get(
+                "action_loss_normalization",
+                dataset_defaults.get("action_loss_normalization", "legacy_per_sample"),
+            ),
             "modalities": group.get("modalities"),
             "canonical_adapter": _merge_mapping(
                 default_canonical_adapter,
@@ -4893,44 +5592,100 @@ def _flatten_mixture_specs(args: argparse.Namespace, config: dict[str, Any]) -> 
             "dataset_weight": _apply_weight_override(
                 float(group.get("dataset_weight", default_dataset_weight)),
                 bool(group.get("distribute_weights", default_distribute_weights)),
-                _lookup_weight_override(source_weight_overrides, [group.get("name"), group.get("_source_file"), group.get("remote_base", group.get("address"))]),
+                _lookup_weight_override(
+                    source_weight_overrides,
+                    [
+                        group.get("name"),
+                        group.get("_source_file"),
+                        group.get("remote_base", group.get("address")),
+                    ],
+                ),
             )[0],
             "distribute_weights": _apply_weight_override(
                 float(group.get("dataset_weight", default_dataset_weight)),
                 bool(group.get("distribute_weights", default_distribute_weights)),
-                _lookup_weight_override(source_weight_overrides, [group.get("name"), group.get("_source_file"), group.get("remote_base", group.get("address"))]),
+                _lookup_weight_override(
+                    source_weight_overrides,
+                    [
+                        group.get("name"),
+                        group.get("_source_file"),
+                        group.get("remote_base", group.get("address")),
+                    ],
+                ),
             )[1],
             "dataset_weight_overrides": dataset_weight_overrides,
             "action_target_dim": group.get("action_target_dim"),
             "state_target_dim": group.get("state_target_dim"),
         }
-        children = _dataset_entries_from_group(group, config_dir, config.get("data_root"))
+        children = _dataset_entries_from_group(
+            group, config_dir, config.get("data_root")
+        )
         for child in children:
             if not isinstance(child, (dict, str)):
-                raise TypeError(f"mixture.specs[{group_id}] dataset entry must be a mapping or string")
+                raise TypeError(
+                    f"mixture.specs[{group_id}] dataset entry must be a mapping or string"
+                )
             if isinstance(child, dict) and child.get("enabled", True) is False:
                 continue
-            specs.append(_make_spec(child, args, idx=len(specs), group_id=group_id, inherited=inherited))
+            specs.append(
+                _make_spec(
+                    child, args, idx=len(specs), group_id=group_id, inherited=inherited
+                )
+            )
     return specs
 
 
-def _flatten_source_specs(args: argparse.Namespace, config: dict[str, Any]) -> list[DatasetSpec] | None:
+def _flatten_source_specs(
+    args: argparse.Namespace, config: dict[str, Any]
+) -> list[DatasetSpec] | None:
     sources = config.get("sources")
     if not isinstance(sources, list):
         return None
 
-    remotes = config.get("remotes", {}) if isinstance(config.get("remotes"), dict) else {}
-    cache_templates = config.get("cache_templates", {}) if isinstance(config.get("cache_templates"), dict) else {}
-    dataset_defaults = config.get("dataset_defaults", {}) if isinstance(config.get("dataset_defaults"), dict) else {}
-    weight_config = config.get("dataset_weights", {}) if isinstance(config.get("dataset_weights"), dict) else {}
-    default_dataset_weight = float(dataset_defaults.get("dataset_weight", config.get("dataset_weight", 1.0)))
-    default_distribute_weights = bool(dataset_defaults.get("distribute_weights", config.get("distribute_weights", False)))
+    remotes = (
+        config.get("remotes", {}) if isinstance(config.get("remotes"), dict) else {}
+    )
+    cache_templates = (
+        config.get("cache_templates", {})
+        if isinstance(config.get("cache_templates"), dict)
+        else {}
+    )
+    dataset_defaults = (
+        config.get("dataset_defaults", {})
+        if isinstance(config.get("dataset_defaults"), dict)
+        else {}
+    )
+    weight_config = (
+        config.get("dataset_weights", {})
+        if isinstance(config.get("dataset_weights"), dict)
+        else {}
+    )
+    default_dataset_weight = float(
+        dataset_defaults.get("dataset_weight", config.get("dataset_weight", 1.0))
+    )
+    default_distribute_weights = bool(
+        dataset_defaults.get(
+            "distribute_weights", config.get("distribute_weights", False)
+        )
+    )
     default_canonical_adapter = dataset_defaults.get("canonical_adapter")
-    source_weight_overrides = weight_config.get("sources", {}) if isinstance(weight_config, dict) else {}
-    source_file_weight_overrides = weight_config.get("source_files", {}) if isinstance(weight_config, dict) else {}
-    embodiment_weight_overrides = weight_config.get("embodiments", {}) if isinstance(weight_config, dict) else {}
-    dataset_weight_overrides = weight_config.get("datasets", {}) if isinstance(weight_config, dict) else {}
-    embodiment_defaults = config.get("embodiments", {}) if isinstance(config.get("embodiments"), dict) else {}
+    source_weight_overrides = (
+        weight_config.get("sources", {}) if isinstance(weight_config, dict) else {}
+    )
+    source_file_weight_overrides = (
+        weight_config.get("source_files", {}) if isinstance(weight_config, dict) else {}
+    )
+    embodiment_weight_overrides = (
+        weight_config.get("embodiments", {}) if isinstance(weight_config, dict) else {}
+    )
+    dataset_weight_overrides = (
+        weight_config.get("datasets", {}) if isinstance(weight_config, dict) else {}
+    )
+    embodiment_defaults = (
+        config.get("embodiments", {})
+        if isinstance(config.get("embodiments"), dict)
+        else {}
+    )
     config_dir = config.get("_config_dir")
     specs: list[DatasetSpec] = []
     source_file_group_ids: dict[str, int] = {}
@@ -4941,7 +5696,9 @@ def _flatten_source_specs(args: argparse.Namespace, config: dict[str, Any]) -> l
             raise TypeError(f"sources[{source_idx}] must be a mapping")
         if source.get("enabled", True) is False:
             continue
-        source_file = str(source.get("_source_file") or source.get("name") or f"source_{source_idx}")
+        source_file = str(
+            source.get("_source_file") or source.get("name") or f"source_{source_idx}"
+        )
         source_file_weight_override = _lookup_weight_override(
             source_file_weight_overrides, [source_file]
         )
@@ -4961,8 +5718,17 @@ def _flatten_source_specs(args: argparse.Namespace, config: dict[str, Any]) -> l
             raise TypeError(f"embodiments.{embodiment} must be a mapping")
         address = source.get("address", source.get("root", source.get("remote_root")))
         source_name = str(source.get("name") or source.get("_source_file") or "")
-        base_source_weight = float(source.get("dataset_weight", emb_cfg.get("dataset_weight", default_dataset_weight)))
-        base_source_distribute = bool(source.get("distribute_weights", emb_cfg.get("distribute_weights", default_distribute_weights)))
+        base_source_weight = float(
+            source.get(
+                "dataset_weight", emb_cfg.get("dataset_weight", default_dataset_weight)
+            )
+        )
+        base_source_distribute = bool(
+            source.get(
+                "distribute_weights",
+                emb_cfg.get("distribute_weights", default_distribute_weights),
+            )
+        )
         if source_file_weight_override is not None:
             source_weight, _ = _apply_weight_override(
                 base_source_weight,
@@ -4974,7 +5740,10 @@ def _flatten_source_specs(args: argparse.Namespace, config: dict[str, Any]) -> l
             source_weight, source_distribute = _apply_weight_override(
                 base_source_weight,
                 base_source_distribute,
-                _lookup_weight_override(source_weight_overrides, [source_name, source.get("_source_file"), address, embodiment]),
+                _lookup_weight_override(
+                    source_weight_overrides,
+                    [source_name, source.get("_source_file"), address, embodiment],
+                ),
             )
             source_weight, source_distribute = _apply_weight_override(
                 source_weight,
@@ -4983,7 +5752,9 @@ def _flatten_source_specs(args: argparse.Namespace, config: dict[str, Any]) -> l
             )
         if source_weight <= 0:
             continue
-        source_modalities = _merge_mapping(emb_cfg.get("modalities"), source.get("modalities"))
+        source_modalities = _merge_mapping(
+            emb_cfg.get("modalities"), source.get("modalities")
+        )
         source_canonical_adapter = _merge_mapping(
             default_canonical_adapter,
             _merge_mapping(
@@ -4996,32 +5767,73 @@ def _flatten_source_specs(args: argparse.Namespace, config: dict[str, Any]) -> l
             "_source_file": source.get("_source_file"),
             "source_name": source_name,
             "remote": source.get("remote", emb_cfg.get("remote")),
-            "remote_base": source.get("remote_base", address if address is not None else emb_cfg.get("remote_base")),
+            "remote_base": source.get(
+                "remote_base",
+                address if address is not None else emb_cfg.get("remote_base"),
+            ),
             "base_path": source.get("base_path", emb_cfg.get("base_path", "")),
-            "stats_path": source.get("stats_path", emb_cfg.get("stats_path", "dataset_stats.json")),
-            "local_stats_path": source.get("local_stats_path", emb_cfg.get("local_stats_path")),
-            "normalization_stats": source.get("normalization_stats", emb_cfg.get("normalization_stats")),
-            "path_index_dir": source.get("path_index_dir", emb_cfg.get("path_index_dir")),
+            "stats_path": source.get(
+                "stats_path", emb_cfg.get("stats_path", "dataset_stats.json")
+            ),
+            "local_stats_path": source.get(
+                "local_stats_path", emb_cfg.get("local_stats_path")
+            ),
+            "normalization_stats": source.get(
+                "normalization_stats", emb_cfg.get("normalization_stats")
+            ),
+            "path_index_dir": source.get(
+                "path_index_dir", emb_cfg.get("path_index_dir")
+            ),
             "require_path_index": source.get(
                 "require_path_index",
-                emb_cfg.get("require_path_index", dataset_defaults.get("require_path_index", False)),
+                emb_cfg.get(
+                    "require_path_index",
+                    dataset_defaults.get("require_path_index", False),
+                ),
             ),
-            "local_data_dir": source.get("local_data_dir", emb_cfg.get("local_data_dir")),
-            "data_root": config.get("data_root") or os.environ.get("WAM_DATA_ROOT", DEFAULT_DATA_ROOT),
-            "cache_root": config.get("cache_root") or os.environ.get("WAM_CACHE_ROOT", DEFAULT_CACHE_ROOT),
+            "local_data_dir": source.get(
+                "local_data_dir", emb_cfg.get("local_data_dir")
+            ),
+            "data_root": config.get("data_root")
+            or os.environ.get("WAM_DATA_ROOT", DEFAULT_DATA_ROOT),
+            "cache_root": config.get("cache_root")
+            or os.environ.get("WAM_CACHE_ROOT", DEFAULT_CACHE_ROOT),
             "local_text_embedding_cache_dir": source.get(
                 "local_text_embedding_cache_dir",
-                source.get("text_embedding_cache_dir", emb_cfg.get("local_text_embedding_cache_dir", emb_cfg.get("text_embedding_cache_dir"))),
+                source.get(
+                    "text_embedding_cache_dir",
+                    emb_cfg.get(
+                        "local_text_embedding_cache_dir",
+                        emb_cfg.get("text_embedding_cache_dir"),
+                    ),
+                ),
             ),
-            "path_index_dir_template": source.get("path_index_dir_template", emb_cfg.get("path_index_dir_template", cache_templates.get("path_index_dir"))),
-            "local_stats_path_template": source.get("local_stats_path_template", emb_cfg.get("local_stats_path_template", cache_templates.get("local_stats_path"))),
+            "path_index_dir_template": source.get(
+                "path_index_dir_template",
+                emb_cfg.get(
+                    "path_index_dir_template", cache_templates.get("path_index_dir")
+                ),
+            ),
+            "local_stats_path_template": source.get(
+                "local_stats_path_template",
+                emb_cfg.get(
+                    "local_stats_path_template", cache_templates.get("local_stats_path")
+                ),
+            ),
             "local_text_embedding_cache_dir_template": source.get(
                 "local_text_embedding_cache_dir_template",
-                emb_cfg.get("local_text_embedding_cache_dir_template", cache_templates.get("local_text_embedding_cache_dir")),
+                emb_cfg.get(
+                    "local_text_embedding_cache_dir_template",
+                    cache_templates.get("local_text_embedding_cache_dir"),
+                ),
             ),
             "context_len": source.get("context_len", emb_cfg.get("context_len", 128)),
-            "text_encoder_id": source.get("text_encoder_id", emb_cfg.get("text_encoder_id", "wan22ti2v5b")),
-            "prompt_template": source.get("prompt_template", emb_cfg.get("prompt_template", DEFAULT_PROMPT)),
+            "text_encoder_id": source.get(
+                "text_encoder_id", emb_cfg.get("text_encoder_id", "wan22ti2v5b")
+            ),
+            "prompt_template": source.get(
+                "prompt_template", emb_cfg.get("prompt_template", DEFAULT_PROMPT)
+            ),
             "task_index_authority": source.get(
                 "task_index_authority",
                 emb_cfg.get(
@@ -5029,7 +5841,9 @@ def _flatten_source_specs(args: argparse.Namespace, config: dict[str, Any]) -> l
                     dataset_defaults.get("task_index_authority", "parquet"),
                 ),
             ),
-            "slow_motion_factor": source.get("slow_motion_factor", emb_cfg.get("slow_motion_factor", 1.0)),
+            "slow_motion_factor": source.get(
+                "slow_motion_factor", emb_cfg.get("slow_motion_factor", 1.0)
+            ),
             "action_loss_weight": source.get(
                 "action_loss_weight",
                 emb_cfg.get(
@@ -5044,29 +5858,58 @@ def _flatten_source_specs(args: argparse.Namespace, config: dict[str, Any]) -> l
                     dataset_defaults.get("action_gripper_loss_weight", 1.0),
                 ),
             ),
-            "sampling_family": source.get("sampling_family", dataset_defaults.get("sampling_family", None)),
-            "allow_padding_at_end": source.get("allow_padding_at_end", dataset_defaults.get("allow_padding_at_end", None)),
-            "action_loss_normalization": source.get("action_loss_normalization", dataset_defaults.get("action_loss_normalization", "legacy_per_sample")),
+            "sampling_family": source.get(
+                "sampling_family", dataset_defaults.get("sampling_family", None)
+            ),
+            "allow_padding_at_end": source.get(
+                "allow_padding_at_end",
+                dataset_defaults.get("allow_padding_at_end", None),
+            ),
+            "action_loss_normalization": source.get(
+                "action_loss_normalization",
+                dataset_defaults.get("action_loss_normalization", "legacy_per_sample"),
+            ),
             "modalities": source_modalities,
             "canonical_adapter": source_canonical_adapter,
-            "format_version": source.get("format_version", source.get("format", emb_cfg.get("format_version", emb_cfg.get("format")))),
+            "format_version": source.get(
+                "format_version",
+                source.get(
+                    "format", emb_cfg.get("format_version", emb_cfg.get("format"))
+                ),
+            ),
             "embodiment": embodiment,
-            "control_schema": source.get("control_schema", emb_cfg.get("control_schema")),
+            "control_schema": source.get(
+                "control_schema", emb_cfg.get("control_schema")
+            ),
             "stats_group": source.get("stats_group", emb_cfg.get("stats_group")),
-            "stats_group_template": source.get("stats_group_template", emb_cfg.get("stats_group_template")),
+            "stats_group_template": source.get(
+                "stats_group_template", emb_cfg.get("stats_group_template")
+            ),
             "dataset_weight": source_weight,
             "distribute_weights": source_distribute,
             "dataset_weight_overrides": dataset_weight_overrides,
-            "action_target_dim": source.get("action_target_dim", emb_cfg.get("action_target_dim")),
-            "state_target_dim": source.get("state_target_dim", emb_cfg.get("state_target_dim")),
+            "action_target_dim": source.get(
+                "action_target_dim", emb_cfg.get("action_target_dim")
+            ),
+            "state_target_dim": source.get(
+                "state_target_dim", emb_cfg.get("state_target_dim")
+            ),
         }
-        children = _dataset_entries_from_group(source, config_dir, config.get("data_root"))
+        children = _dataset_entries_from_group(
+            source, config_dir, config.get("data_root")
+        )
         for child in children:
             if not isinstance(child, (dict, str)):
-                raise TypeError(f"sources[{source_idx}] dataset entry must be a mapping or string")
+                raise TypeError(
+                    f"sources[{source_idx}] dataset entry must be a mapping or string"
+                )
             if isinstance(child, dict) and child.get("enabled", True) is False:
                 continue
-            specs.append(_make_spec(child, args, idx=len(specs), group_id=group_id, inherited=inherited))
+            specs.append(
+                _make_spec(
+                    child, args, idx=len(specs), group_id=group_id, inherited=inherited
+                )
+            )
     return specs
 
 
@@ -5077,7 +5920,10 @@ def _load_specs(args: argparse.Namespace, config: dict[str, Any]) -> list[Datase
         if maybe_path.exists():
             text = maybe_path.read_text(encoding="utf-8")
         raw_specs = json.loads(text)
-        return [_make_spec(item, args, idx=idx, group_id=idx) for idx, item in enumerate(raw_specs)]
+        return [
+            _make_spec(item, args, idx=idx, group_id=idx)
+            for idx, item in enumerate(raw_specs)
+        ]
 
     source_specs = _flatten_source_specs(args, config)
     if source_specs is not None:
@@ -5088,10 +5934,15 @@ def _load_specs(args: argparse.Namespace, config: dict[str, Any]) -> list[Datase
         return mixture_specs
 
     if isinstance(config.get("datasets"), list):
-        return [_make_spec(item, args, idx=idx, group_id=idx) for idx, item in enumerate(config["datasets"])]
+        return [
+            _make_spec(item, args, idx=idx, group_id=idx)
+            for idx, item in enumerate(config["datasets"])
+        ]
 
     if not args.remote_root:
-        raise ValueError("provide --remote-root, --dataset-specs-json, or --dataset-config")
+        raise ValueError(
+            "provide --remote-root, --dataset-specs-json, or --dataset-config"
+        )
     return [DatasetSpec(name=args.name, remote_root=args.remote_root)]
 
 
@@ -5109,28 +5960,78 @@ def _summarize_item(item: dict[str, Any]) -> dict[str, Any]:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--dataset-config", type=Path, default=None, help="YAML config describing one or more local mix datasets.")
-    parser.add_argument("--remote-root", default=None, help="Local LeRobot dataset root, e.g. /path/to/data/ego/egodex")
+    parser.add_argument(
+        "--dataset-config",
+        type=Path,
+        default=None,
+        help="YAML config describing one or more local mix datasets.",
+    )
+    parser.add_argument(
+        "--remote-root",
+        default=None,
+        help="Local LeRobot dataset root, e.g. /path/to/data/ego/egodex",
+    )
     parser.add_argument("--name", default="dataset")
-    parser.add_argument("--dataset-specs-json", default=None, help="JSON string or path containing a list of {name, remote_root, stats_path} specs.")
+    parser.add_argument(
+        "--dataset-specs-json",
+        default=None,
+        help="JSON string or path containing a list of {name, remote_root, stats_path} specs.",
+    )
     parser.add_argument("--index", type=int, default=0)
     parser.add_argument("--num-frames", type=int, default=None)
     parser.add_argument("--action-size", type=int, default=None)
     parser.add_argument("--global-sample-stride", type=int, default=None)
     parser.add_argument("--with-video", action="store_true")
-    parser.add_argument("--load-stats", action="store_true", help="Also read each configured dataset_stats.json and print its top-level keys.")
-    parser.add_argument("--epoch", type=int, default=0, help="Coverage cycle used by deterministic random-segment training sampling.")
-    parser.add_argument("--eval-mode", action="store_true", help="Force deterministic eval subset mode instead of training random sampling.")
+    parser.add_argument(
+        "--load-stats",
+        action="store_true",
+        help="Also read each configured dataset_stats.json and print its top-level keys.",
+    )
+    parser.add_argument(
+        "--epoch",
+        type=int,
+        default=0,
+        help="Coverage cycle used by deterministic random-segment training sampling.",
+    )
+    parser.add_argument(
+        "--eval-mode",
+        action="store_true",
+        help="Force deterministic eval subset mode instead of training random sampling.",
+    )
     parser.add_argument("--eval-episodes-per-dataset", type=int, default=None)
     parser.add_argument("--eval-frames-per-episode", type=int, default=None)
-    parser.add_argument("--eval-frame-policy", choices=["first", "middle", "last", "uniform", "random"], default=None)
-    parser.add_argument("--eval-scope", choices=["dataset", "source", "source_type", "type", "source_entry"], default=None)
+    parser.add_argument(
+        "--eval-frame-policy",
+        choices=["first", "middle", "last", "uniform", "random"],
+        default=None,
+    )
+    parser.add_argument(
+        "--eval-scope",
+        choices=["dataset", "source", "source_type", "type", "source_entry"],
+        default=None,
+    )
     parser.add_argument("--eval-segments-per-source", type=int, default=None)
     parser.add_argument("--eval-total-samples", type=int, default=None)
-    parser.add_argument("--eval-fixed-samples-json", default=None, help="JSON string/path for fixed eval samples.")
-    parser.add_argument("--eval-fixed-per-dataset", action="store_true", help="Use one fixed eval sample from every expanded dataset.")
-    parser.add_argument("--eval-exclude-from-training", choices=["none", "sample", "episode"], default=None)
-    parser.add_argument("--profile", action="store_true", help="Print coarse timing breakdown for local loading.")
+    parser.add_argument(
+        "--eval-fixed-samples-json",
+        default=None,
+        help="JSON string/path for fixed eval samples.",
+    )
+    parser.add_argument(
+        "--eval-fixed-per-dataset",
+        action="store_true",
+        help="Use one fixed eval sample from every expanded dataset.",
+    )
+    parser.add_argument(
+        "--eval-exclude-from-training",
+        choices=["none", "sample", "episode"],
+        default=None,
+    )
+    parser.add_argument(
+        "--profile",
+        action="store_true",
+        help="Print coarse timing breakdown for local loading.",
+    )
     parser.add_argument("--save-summary", type=Path, default=None)
     return parser.parse_args()
 
@@ -5142,11 +6043,19 @@ def main() -> None:
     t_main = time.perf_counter()
     config = _read_dataset_config(args.dataset_config)
     specs = _load_specs(args, config)
-    num_frames = int(_resolved_arg(args.num_frames, config, "sampling", "num_frames", 33))
-    action_size = _resolved_arg(args.action_size, config, "sampling", "action_size", None)
+    num_frames = int(
+        _resolved_arg(args.num_frames, config, "sampling", "num_frames", 33)
+    )
+    action_size = _resolved_arg(
+        args.action_size, config, "sampling", "action_size", None
+    )
     if action_size is not None:
         action_size = int(action_size)
-    global_sample_stride = int(_resolved_arg(args.global_sample_stride, config, "sampling", "global_sample_stride", 1))
+    global_sample_stride = int(
+        _resolved_arg(
+            args.global_sample_stride, config, "sampling", "global_sample_stride", 1
+        )
+    )
 
     t0 = time.perf_counter()
     datasets = [
@@ -5158,15 +6067,24 @@ def main() -> None:
         )
         for spec in specs
     ]
-    _profile_record("main.build_datasets", time.perf_counter() - t0, num_datasets=len(datasets))
+    _profile_record(
+        "main.build_datasets", time.perf_counter() - t0, num_datasets=len(datasets)
+    )
     if args.load_stats:
         for ds in datasets:
             t0 = time.perf_counter()
             stats = ds.load_dataset_stats()
-            _profile_record("main.load_stats", time.perf_counter() - t0, dataset=ds.name)
-            print(f"[stats] dataset={ds.name} stats_path={ds.spec.stats_path} keys={list(stats.keys())}", flush=True)
+            _profile_record(
+                "main.load_stats", time.perf_counter() - t0, dataset=ds.name
+            )
+            print(
+                f"[stats] dataset={ds.name} stats_path={ds.spec.stats_path} keys={list(stats.keys())}",
+                flush=True,
+            )
 
-    mixture_cfg = config.get("mixture", {}) if isinstance(config.get("mixture"), dict) else {}
+    mixture_cfg = (
+        config.get("mixture", {}) if isinstance(config.get("mixture"), dict) else {}
+    )
     eval_cfg = mixture_cfg.get("eval_subset", mixture_cfg.get("eval", {}))
     if not isinstance(eval_cfg, dict):
         eval_cfg = {}
@@ -5185,7 +6103,9 @@ def main() -> None:
     eval_frames_per_episode = args.eval_frames_per_episode
     if eval_frames_per_episode is None:
         eval_frames_per_episode = eval_cfg.get("frames_per_episode")
-    eval_frame_policy = args.eval_frame_policy or str(eval_cfg.get("frame_policy", "first"))
+    eval_frame_policy = args.eval_frame_policy or str(
+        eval_cfg.get("frame_policy", "first")
+    )
     eval_scope = args.eval_scope or str(eval_cfg.get("scope", "dataset"))
     eval_fixed_samples = eval_cfg.get("fixed_samples")
     if args.eval_fixed_samples_json:
@@ -5194,7 +6114,9 @@ def main() -> None:
         if fixed_path.exists():
             fixed_text = fixed_path.read_text(encoding="utf-8")
         eval_fixed_samples = json.loads(fixed_text)
-    eval_fixed_per_dataset = bool(args.eval_fixed_per_dataset or eval_cfg.get("fixed_per_dataset", False))
+    eval_fixed_per_dataset = bool(
+        args.eval_fixed_per_dataset or eval_cfg.get("fixed_per_dataset", False)
+    )
     eval_fixed_episode_pos = eval_cfg.get("episode_pos", 0)
     eval_fixed_frame_index = int(eval_cfg.get("frame_index", 0))
     eval_exclude_from_training = args.eval_exclude_from_training
@@ -5205,25 +6127,49 @@ def main() -> None:
         eval_segments_per_source = eval_cfg.get("segments_per_source")
     eval_total_samples = args.eval_total_samples
     if eval_total_samples is None:
-        eval_total_samples = eval_cfg.get("total_samples", eval_cfg.get("eval_total_samples"))
+        eval_total_samples = eval_cfg.get(
+            "total_samples", eval_cfg.get("eval_total_samples")
+        )
     dataset = PretrainLeRobotMixture(
         datasets,
         dataset_weights=dataset_weights,
         training=training,
         balance_dataset_weights=bool(mixture_cfg.get("balance_dataset_weights", False)),
-        balance_trajectory_weights=bool(mixture_cfg.get("balance_trajectory_weights", True)),
+        balance_trajectory_weights=bool(
+            mixture_cfg.get("balance_trajectory_weights", True)
+        ),
         seed=int(mixture_cfg.get("seed", 42)),
         allow_padding_at_end=allow_padding_at_end,
         epoch_length=None if epoch_length in (None, "") else int(epoch_length),
-        eval_episodes_per_dataset=None if eval_episodes_per_dataset in (None, "") else int(eval_episodes_per_dataset),
-        eval_frames_per_episode=None if eval_frames_per_episode in (None, "") else int(eval_frames_per_episode),
+        eval_episodes_per_dataset=(
+            None
+            if eval_episodes_per_dataset in (None, "")
+            else int(eval_episodes_per_dataset)
+        ),
+        eval_frames_per_episode=(
+            None
+            if eval_frames_per_episode in (None, "")
+            else int(eval_frames_per_episode)
+        ),
         eval_frame_policy=eval_frame_policy,
         eval_scope=eval_scope,
-        eval_segments_per_source=None if eval_segments_per_source in (None, "") else int(eval_segments_per_source),
-        eval_total_samples=None if eval_total_samples in (None, "") else int(eval_total_samples),
-        eval_fixed_samples=eval_fixed_samples if isinstance(eval_fixed_samples, list) else None,
+        eval_segments_per_source=(
+            None
+            if eval_segments_per_source in (None, "")
+            else int(eval_segments_per_source)
+        ),
+        eval_total_samples=(
+            None if eval_total_samples in (None, "") else int(eval_total_samples)
+        ),
+        eval_fixed_samples=(
+            eval_fixed_samples if isinstance(eval_fixed_samples, list) else None
+        ),
         eval_fixed_per_dataset=eval_fixed_per_dataset,
-        eval_fixed_episode_pos=None if eval_fixed_episode_pos in (None, "") else int(eval_fixed_episode_pos),
+        eval_fixed_episode_pos=(
+            None
+            if eval_fixed_episode_pos in (None, "")
+            else int(eval_fixed_episode_pos)
+        ),
         eval_fixed_frame_index=eval_fixed_frame_index,
         eval_exclude_from_training=eval_exclude_from_training,
         training_block_size=int(mixture_cfg.get("training_block_size", 4)),
@@ -5245,12 +6191,17 @@ def main() -> None:
         t0 = time.perf_counter()
         video = dataset.get_video_for_item(item)
         _profile_record("main.get_video", time.perf_counter() - t0)
-        print(f"[video] shape={tuple(video.shape)} dtype={video.dtype} range=({video.min().item():.4f},{video.max().item():.4f})", flush=True)
+        print(
+            f"[video] shape={tuple(video.shape)} dtype={video.dtype} range=({video.min().item():.4f},{video.max().item():.4f})",
+            flush=True,
+        )
         summary["video"] = {"shape": list(video.shape), "dtype": str(video.dtype)}
 
     if args.save_summary is not None:
         args.save_summary.parent.mkdir(parents=True, exist_ok=True)
-        args.save_summary.write_text(json.dumps(summary, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        args.save_summary.write_text(
+            json.dumps(summary, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+        )
         print(f"[OK] wrote {args.save_summary}", flush=True)
 
     _profile_record("main.total", time.perf_counter() - t_main)
@@ -5264,6 +6215,7 @@ def _dataset_allows_end_padding(
     override = getattr(dataset.spec, "allow_padding_at_end", None)
     return bool(default if override is None else override)
 
+
 def _dataset_valid_start_count(
     dataset: PretrainLeRobotDataset,
     default_allow_padding_at_end: bool,
@@ -5273,6 +6225,7 @@ def _dataset_valid_start_count(
             _dataset_allows_end_padding(dataset, default_allow_padding_at_end)
         ).sum()
     )
+
 
 if __name__ == "__main__":
     main()
