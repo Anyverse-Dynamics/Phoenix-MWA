@@ -1,17 +1,11 @@
 Phoenix-MWA licensing notice
 
-From the licensing update dated 2026-10-23, original material owned by or
-licensed for distribution by Anyverse Dynamics is offered under the
-Phoenix-MWA Academic Research License 1.0 in LICENSE, subject to the exclusions
-and prior grants described there. Commercial licensing inquiries:
-zhengyupeng18@mails.ucas.ac.cn.
-
-Before this update, the main branch at commit
-de22718908d61529bd0fce2533fc7053e5cf4ec8
-carried the MIT License. Its text and original attribution are preserved in
-LICENSES/Phoenix-MWA-legacy-MIT.txt. Earlier MIT grants remain available for
-the material they cover, including commercial-use permissions. This update
-does not retroactively restrict those grants or claim third-party ownership.
+As of 2026-10-28, project-original source code and documentation are
+available under the MIT License in LICENSE, including commercial use.
+Existing copyright notices and earlier license grants are preserved.
+Third-party components retain their own licenses; the project MIT grant
+does not relicense them. External weights, datasets, robot assets and
+trademarks remain subject to their respective terms.
 
 The institution logos in docs/assets/ were copied from the Phoenix project
 page (https://openphoenix-team.github.io/Phoenix-pages/). They identify

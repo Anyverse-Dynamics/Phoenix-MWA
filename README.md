@@ -164,3 +164,11 @@ Welcome to join us to share experimental results, ask questions, and exchange di
 <p align="center">
   <img src="docs/assets/wechat-group-qr.jpg" alt="MWA-Phoenix WeChat group QR code" width="420">
 </p>
+
+## License
+
+Project-original code is available under the [MIT License](LICENSE),
+including commercial use. Preserve the copyright and permission notices.
+Bundled third-party components retain their own terms; see [NOTICE](NOTICE)
+and [LICENSES/](LICENSES/). Model weights, datasets and trademarks are
+covered by their respective terms.
