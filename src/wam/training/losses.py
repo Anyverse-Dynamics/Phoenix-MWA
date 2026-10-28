@@ -104,9 +104,7 @@ def _encode_single_memory_frame(
                 dtype=torch.bool,
                 device=model.device,
             )
-        return cached_latents, pad[:, :1].to(
-            device=model.device, dtype=torch.bool
-        )
+        return cached_latents, pad[:, :1].to(device=model.device, dtype=torch.bool)
 
     video = inputs.get(name)
     if video is None:
@@ -214,9 +212,7 @@ def _frame_video_loss(
     latent_spatial_valid_mask: torch.Tensor | None,
     timestep: torch.Tensor,
 ) -> torch.Tensor:
-    element = F.mse_loss(
-        pred_video.float(), target_video.float(), reduction="none"
-    )
+    element = F.mse_loss(pred_video.float(), target_video.float(), reduction="none")
     valid = torch.ones_like(element, dtype=torch.bool)
     if latent_spatial_valid_mask is not None:
         expected = (int(pred_video.shape[0]), *map(int, pred_video.shape[-2:]))
@@ -235,9 +231,9 @@ def _frame_video_loss(
                 "Future video padding cannot be aligned to VAE latent frames: "
                 f"future_frames={int(tail_pad.shape[1])}, factor={temporal_factor}."
             )
-        latent_pad = tail_pad.reshape(
-            int(tail_pad.shape[0]), -1, temporal_factor
-        ).all(dim=2)
+        latent_pad = tail_pad.reshape(int(tail_pad.shape[0]), -1, temporal_factor).all(
+            dim=2
+        )
         expected = (int(element.shape[0]), int(element.shape[2]))
         if tuple(latent_pad.shape) != expected:
             raise ValueError(
@@ -246,9 +242,11 @@ def _frame_video_loss(
             )
         # (B, T) -> (B, 1, T, 1, 1).
         valid &= ~latent_pad[:, None, :, None, None]
-    weight = model.train_video_scheduler.training_weight(timestep).to(
-        device=element.device, dtype=element.dtype
-    ).reshape(-1)
+    weight = (
+        model.train_video_scheduler.training_weight(timestep)
+        .to(device=element.device, dtype=element.dtype)
+        .reshape(-1)
+    )
     weighted_element = element * weight[:, None, None, None, None]
     return _distributed_masked_mean(weighted_element, valid)
 
@@ -296,9 +294,11 @@ def _frame_action_loss(
     per_sample = (element * valid_float).sum(dim=(1, 2)) / valid_float.sum(
         dim=(1, 2)
     ).clamp(min=1.0)
-    weight = model.train_action_scheduler.training_weight(timestep).to(
-        device=per_sample.device, dtype=per_sample.dtype
-    ).reshape(-1)
+    weight = (
+        model.train_action_scheduler.training_weight(timestep)
+        .to(device=per_sample.device, dtype=per_sample.dtype)
+        .reshape(-1)
+    )
     if action_loss_weighted_valid_cells is None:
         policy = torch.zeros_like(per_sample, dtype=torch.bool)
     else:
@@ -385,21 +385,13 @@ def _frame_action_loss(
     for pool_index in range(int(weighted_pool.shape[1])):
         in_pool = weighted_pool[:, pool_index]
         absolute_weight = cell_weight[in_pool]
-        relative_weight = absolute_weight / sample_loss_weight[
-            in_pool, None, None
-        ]
+        relative_weight = absolute_weight / sample_loss_weight[in_pool, None, None]
         weighted_denominators.append(relative_weight.sum())
         weighted_valid_samples.append(
-            (relative_weight.sum(dim=(1, 2)) > 0)
-            .sum()
-            .to(per_sample.dtype)
+            (relative_weight.sum(dim=(1, 2)) > 0).sum().to(per_sample.dtype)
         )
         weighted_numerators.append(
-            (
-                raw_element[in_pool]
-                * absolute_weight
-                * weight[in_pool, None, None]
-            ).sum()
+            (raw_element[in_pool] * absolute_weight * weight[in_pool, None, None]).sum()
         )
 
     global_stats, world_size = _distributed_sum_detached(
@@ -434,21 +426,16 @@ def _frame_action_loss(
             / global_weighted_denominators[pool_index]
         )
         local_weighted_objective = (
-            local_weighted_objective
-            + weighted_numerators[pool_index] * scale
+            local_weighted_objective + weighted_numerators[pool_index] * scale
         )
         global_weighted_objective = (
-            global_weighted_objective
-            + global_weighted_numerators[pool_index] * scale
+            global_weighted_objective + global_weighted_numerators[pool_index] * scale
         )
     local_objective_sum = legacy_sum + local_weighted_objective
     # Preserve legacy-per-sample versus family-separated weighted-cell mixing
     # while making the gradient equal to one globally materialized batch.
     backward_loss = world_size * local_objective_sum / global_total_count
-    global_loss = (
-        global_legacy_sum
-        + global_weighted_objective
-    ) / global_total_count
+    global_loss = (global_legacy_sum + global_weighted_objective) / global_total_count
     return backward_loss + (global_loss - backward_loss.detach())
 
 
@@ -470,9 +457,7 @@ def _sample_training_time_rtc_delays(
     if batch_size <= 0:
         raise ValueError(f"`batch_size` must be positive, got {batch_size}.")
     if action_horizon <= 0:
-        raise ValueError(
-            f"`action_horizon` must be positive, got {action_horizon}."
-        )
+        raise ValueError(f"`action_horizon` must be positive, got {action_horizon}.")
     if max_delay_steps < 0 or max_delay_steps >= action_horizon:
         raise ValueError(
             "`max_delay_steps` must satisfy 0 <= max_delay_steps < "
@@ -492,9 +477,9 @@ def _sample_training_time_rtc_delays(
                 f"got {tuple(action_is_pad.shape)} vs "
                 f"{(batch_size, action_horizon)}."
             )
-        valid_action_steps = (~action_is_pad.to(
-            device=device, dtype=torch.bool
-        )).sum(dim=1)
+        valid_action_steps = (~action_is_pad.to(device=device, dtype=torch.bool)).sum(
+            dim=1
+        )
         # Dataset chunks contain at least one valid action. Capping at
         # valid_steps - 1 leaves one or more valid postfix targets for every
         # such sample, including chunks padded at the end of an episode.
@@ -503,9 +488,9 @@ def _sample_training_time_rtc_delays(
         )
 
     uniform = torch.rand((batch_size,), device=device, dtype=torch.float32)
-    return torch.floor(
-        uniform * (per_sample_max + 1).to(dtype=torch.float32)
-    ).to(dtype=torch.long)
+    return torch.floor(uniform * (per_sample_max + 1).to(dtype=torch.float32)).to(
+        dtype=torch.long
+    )
 
 
 def _joint96_masked_mse(
@@ -522,7 +507,9 @@ def _joint96_masked_mse(
     valid = valid.to(device=prediction.device, dtype=torch.bool).expand_as(prediction)
     counts = valid.flatten(1).sum(dim=1)
     if bool((counts == 0).any()):
-        raise ValueError(f"joint96 {name} has a sample with no valid supervised elements.")
+        raise ValueError(
+            f"joint96 {name} has a sample with no valid supervised elements."
+        )
     # Mask before subtraction/squaring so invalid NaN/Inf values cannot leak.
     prediction = prediction.float().masked_fill(~valid, 0.0)
     target = target.float().masked_fill(~valid, 0.0)
@@ -542,7 +529,9 @@ def _joint96_temporal_valid_mask(model, inputs: dict) -> torch.Tensor:
     if image_is_pad is None:
         return torch.ones((batch_size, frames), dtype=torch.bool, device=latents.device)
     if bool(image_is_pad[:, 0].any()):
-        raise ValueError("joint96 requires a real first conditioning frame in every sample.")
+        raise ValueError(
+            "joint96 requires a real first conditioning frame in every sample."
+        )
     factor = int(model.vae.temporal_downsample_factor)
     if int(image_is_pad.shape[1]) != 1 + (frames - 1) * factor:
         raise ValueError("joint96 image padding does not match the latent timeline.")
@@ -554,18 +543,28 @@ def _joint96_temporal_valid_mask(model, inputs: dict) -> torch.Tensor:
 
 def _joint96_training_loss(model, sample, *, tiled: bool):
     from wam.model.modules.conditioning.embodiment_prompt import action_prompt_kwargs
+
     inputs = build_wam_inputs(model, sample, tiled=tiled)
     if float(model.loss_lambda_video) != 1.0 or float(model.loss_lambda_action) != 1.0:
-        raise ValueError("joint96 requires lambda_video=lambda_action=1 (0.5 VAE + 0.5 CSVAE + action).")
+        raise ValueError(
+            "joint96 requires lambda_video=lambda_action=1 (0.5 VAE + 0.5 CSVAE + action)."
+        )
     if bool(getattr(model.action_expert, "training_time_rtc_enabled", False)):
         raise ValueError("joint96 does not enable training-time RTC prefixes.")
     if bool(getattr(model.video_expert, "action_conditioned", False)):
-        raise ValueError("joint96 requires the Joint video expert, not GT-action context conditioning.")
+        raise ValueError(
+            "joint96 requires the Joint video expert, not GT-action context conditioning."
+        )
     for name in ("action_dim_loss_weight", "action_loss_weight"):
         value = inputs.get(name)
         if value is not None and not bool((value == 1).all()):
-            raise ValueError(f"joint96 sample-equal loss does not support non-unit {name}.")
-    for name in ("action_loss_weighted_valid_cells", "action_loss_weighted_valid_cells_pool"):
+            raise ValueError(
+                f"joint96 sample-equal loss does not support non-unit {name}."
+            )
+    for name in (
+        "action_loss_weighted_valid_cells",
+        "action_loss_weighted_valid_cells_pool",
+    ):
         value = inputs.get(name)
         if value is not None and bool(value.any()):
             raise ValueError(f"joint96 sample-equal loss does not support {name}.")
@@ -574,9 +573,14 @@ def _joint96_training_loss(model, sample, *, tiled: bool):
     batch_size, _, frames, height, width = input_latents.shape
     patch_t, patch_h, patch_w = map(int, model.video_expert.patch_size)
     if patch_t != 1 or height % patch_h or (width // 3) % patch_w:
-        raise ValueError("joint96 patches must align independently to every camera and frame.")
+        raise ValueError(
+            "joint96 patches must align independently to every camera and frame."
+        )
     spatial_valid = joint96_camera_valid_mask(
-        inputs["camera_is_pad"], batch_size=batch_size, height=height, width=width,
+        inputs["camera_is_pad"],
+        batch_size=batch_size,
+        height=height,
+        width=width,
         device=input_latents.device,
     )
     frame_valid = _joint96_temporal_valid_mask(model, inputs)
@@ -584,12 +588,18 @@ def _joint96_training_loss(model, sample, *, tiled: bool):
     input_latents = input_latents.masked_fill(~latent_valid, 0.0)
     noise_video = torch.randn_like(input_latents).masked_fill(~latent_valid, 0.0)
     timestep_video = model.train_video_scheduler.sample_training_t(
-        batch_size=batch_size, device=model.device, dtype=input_latents.dtype,
+        batch_size=batch_size,
+        device=model.device,
+        dtype=input_latents.dtype,
     )
-    noisy_video = model.train_video_scheduler.add_noise(input_latents, noise_video, timestep_video)
+    noisy_video = model.train_video_scheduler.add_noise(
+        input_latents, noise_video, timestep_video
+    )
     noisy_video = noisy_video.masked_fill(~latent_valid, 0.0)
     noisy_video[:, :, :1] = input_latents[:, :, :1]
-    target_video = model.train_video_scheduler.training_target(input_latents, noise_video, timestep_video)
+    target_video = model.train_video_scheduler.training_target(
+        input_latents, noise_video, timestep_video
+    )
     target_video = target_video.masked_fill(~latent_valid, 0.0)
     target_video[:, :, :1] = 0.0
 
@@ -602,34 +612,52 @@ def _joint96_training_loss(model, sample, *, tiled: bool):
     if inputs.get("action_dim_is_pad") is not None:
         action_valid &= ~inputs["action_dim_is_pad"].unsqueeze(1)
     if bool((~action_valid.flatten(1).any(dim=1)).any()):
-        raise ValueError("joint96 requires valid action supervision in every Robot sample.")
+        raise ValueError(
+            "joint96 requires valid action supervision in every Robot sample."
+        )
     action = action.masked_fill(~action_valid, 0.0)
     noise_action = torch.randn_like(action).masked_fill(~action_valid, 0.0)
     timestep_action = model.train_action_scheduler.sample_training_t(
-        batch_size=batch_size, device=model.device, dtype=action.dtype,
+        batch_size=batch_size,
+        device=model.device,
+        dtype=action.dtype,
     )
-    noisy_action = model.train_action_scheduler.add_noise(action, noise_action, timestep_action)
+    noisy_action = model.train_action_scheduler.add_noise(
+        action, noise_action, timestep_action
+    )
     noisy_action = noisy_action.masked_fill(~action_valid, 0.0)
-    target_action = model.train_action_scheduler.training_target(action, noise_action, timestep_action)
+    target_action = model.train_action_scheduler.training_target(
+        action, noise_action, timestep_action
+    )
     target_action = target_action.masked_fill(~action_valid, 0.0)
 
     video_pre = model.video_expert.pre_dit(
         x=noisy_video,
         timestep=timestep_video[:, None].expand(-1, frames - 1),
-        context=inputs["context"], context_mask=inputs["context_mask"],
+        context=inputs["context"],
+        context_mask=inputs["context_mask"],
         fuse_vae_embedding_in_latents=True,
-        frame_ids=sequence_start_video_rope_time_ids(batch_size, frames, device=input_latents.device),
+        frame_ids=sequence_start_video_rope_time_ids(
+            batch_size, frames, device=input_latents.device
+        ),
     )
     action_pre = model.action_expert.pre_dit(
-        action_tokens=noisy_action, timestep=timestep_action,
-        context=inputs["context"], context_mask=inputs["context_mask"],
+        action_tokens=noisy_action,
+        timestep=timestep_action,
+        context=inputs["context"],
+        context_mask=inputs["context_mask"],
         **action_prompt_kwargs(model.action_expert, sample),
     )
     grid = (frames, height // patch_h, width // patch_w)
     if tuple(video_pre["meta"]["grid_size"]) != grid:
-        raise ValueError("joint96 VideoDiT grid does not match the three-view latent canvas.")
+        raise ValueError(
+            "joint96 VideoDiT grid does not match the three-view latent canvas."
+        )
     spatial_token_valid = joint96_camera_valid_mask(
-        inputs["camera_is_pad"], batch_size=batch_size, height=grid[1], width=grid[2],
+        inputs["camera_is_pad"],
+        batch_size=batch_size,
+        height=grid[1],
+        width=grid[2],
         device=input_latents.device,
     ).flatten(1)
     tokens_per_frame = int(spatial_token_valid.shape[1])
@@ -640,8 +668,10 @@ def _joint96_training_loss(model, sample, *, tiled: bool):
     if tuple(video_pre["tokens"].shape[:2]) != tuple(video_valid.shape):
         raise ValueError("joint96 video token count does not match its validity mask.")
     attention_mask = build_joint96_attention_mask(
-        video_seq_len=int(video_valid.shape[1]), action_seq_len=int(action_token_valid.shape[1]),
-        video_tokens_per_frame=tokens_per_frame, device=input_latents.device,
+        video_seq_len=int(video_valid.shape[1]),
+        action_seq_len=int(action_token_valid.shape[1]),
+        video_tokens_per_frame=tokens_per_frame,
+        device=input_latents.device,
     )
     validity = {"video": video_valid, "action": action_token_valid}
     states = {"video": video_pre, "action": action_pre}
@@ -653,7 +683,9 @@ def _joint96_training_loss(model, sample, *, tiled: bool):
         elif mask.ndim == 4:
             mask = mask & validity[name][:, None, :, None]
         else:
-            raise ValueError("joint96 expert context masks must be [B,S,L] or [B,1,S,L].")
+            raise ValueError(
+                "joint96 expert context masks must be [B,S,L] or [B,1,S,L]."
+            )
         contexts[name] = {"context": pre["context"], "mask": mask}
     tokens_out = model.mot(
         embeds_all={name: pre["tokens"] for name, pre in states.items()},
@@ -661,33 +693,52 @@ def _joint96_training_loss(model, sample, *, tiled: bool):
         freqs_all={name: pre["freqs"] for name, pre in states.items()},
         context_all=contexts,
         t_mod_all={name: pre["t_mod"] for name, pre in states.items()},
-        key_masks_all=validity, query_masks_all=validity,
+        key_masks_all=validity,
+        query_masks_all=validity,
     )
     pred_video = model.video_expert.post_dit(tokens_out["video"], video_pre)[:, :, 1:]
     pred_action = model.action_expert.post_dit(tokens_out["action"], action_pre)
     future_valid = latent_valid[:, :, 1:]
     video_weight = model.train_video_scheduler.training_weight(timestep_video)
     loss_vae, mse_vae = _joint96_masked_mse(
-        pred_video[:, :48], target_video[:, :48, 1:], future_valid, video_weight, name="VAE",
+        pred_video[:, :48],
+        target_video[:, :48, 1:],
+        future_valid,
+        video_weight,
+        name="VAE",
     )
     loss_csvae, mse_csvae = _joint96_masked_mse(
-        pred_video[:, 48:], target_video[:, 48:, 1:], future_valid, video_weight, name="CSVAE",
+        pred_video[:, 48:],
+        target_video[:, 48:, 1:],
+        future_valid,
+        video_weight,
+        name="CSVAE",
     )
     loss_action, mse_action = _joint96_masked_mse(
-        pred_action, target_action, action_valid,
-        model.train_action_scheduler.training_weight(timestep_action), name="action",
+        pred_action,
+        target_action,
+        action_valid,
+        model.train_action_scheduler.training_weight(timestep_action),
+        name="action",
     )
     loss_video = 0.5 * (loss_vae + loss_csvae)
     return loss_video + loss_action, {
-        "loss_video": loss_video.detach(), "loss_action": loss_action.detach(),
-        "loss_vae": 0.5 * loss_vae.detach(), "loss_csvae": 0.5 * loss_csvae.detach(),
+        "loss_video": loss_video.detach(),
+        "loss_action": loss_action.detach(),
+        "loss_vae": 0.5 * loss_vae.detach(),
+        "loss_csvae": 0.5 * loss_csvae.detach(),
         # Raw branch losses include timestep weighting, but not the 0.5 coefficients.
-        "loss_vae_raw": loss_vae.detach(), "loss_csvae_raw": loss_csvae.detach(),
-        "mse_vae": mse_vae, "mse_csvae": mse_csvae, "mse_action": mse_action,
+        "loss_vae_raw": loss_vae.detach(),
+        "loss_csvae_raw": loss_csvae.detach(),
+        "mse_vae": mse_vae,
+        "mse_csvae": mse_csvae,
+        "mse_action": mse_action,
     }
 
 
-def frame_training_loss(model, sample, tiled: bool = False, global_step: int | None = None):
+def frame_training_loss(
+    model, sample, tiled: bool = False, global_step: int | None = None
+):
     """FastWAM-style one-window joint video/action objective.
 
     Each sample contains a clean anchor frame, one previous-decision recent
@@ -732,9 +783,7 @@ def frame_training_loss(model, sample, tiled: bool = False, global_step: int | N
     action_mask = inputs.get("action_mask")
     action_dim_loss_weight = inputs.get("action_dim_loss_weight")
     action_loss_weight = inputs.get("action_loss_weight")
-    action_loss_weighted_valid_cells = inputs.get(
-        "action_loss_weighted_valid_cells"
-    )
+    action_loss_weighted_valid_cells = inputs.get("action_loss_weighted_valid_cells")
     action_loss_weighted_valid_cells_pool = inputs.get(
         "action_loss_weighted_valid_cells_pool"
     )
@@ -762,9 +811,7 @@ def frame_training_loss(model, sample, tiled: bool = False, global_step: int | N
         device=model.device,
         dtype=input_latents.dtype,
     )
-    semantic_active = torch.zeros(
-        (batch_size,), dtype=torch.bool, device=model.device
-    )
+    semantic_active = torch.zeros((batch_size,), dtype=torch.bool, device=model.device)
     if model.semantic_future_alignment_enabled:
         semantic_active = timestep_video.float() <= (
             model.semantic_future_max_sigma
@@ -781,32 +828,33 @@ def frame_training_loss(model, sample, tiled: bool = False, global_step: int | N
         noisy_window = noisy_window.masked_fill(~latent_valid, 0.0)
         target_window = target_window.masked_fill(~latent_valid, 0.0)
     noisy_window[:, :, :1] = input_latents[:, :, :1]
-    video_latents = torch.cat(
-        [anchor_latents, recent_latents, noisy_window], dim=2
-    )
+    video_latents = torch.cat([anchor_latents, recent_latents, noisy_window], dim=2)
     future_latent_frames = int(input_latents.shape[2]) - 1
     if model.future_delta_enabled:
         patch_size = tuple(int(v) for v in model.video_expert.patch_size)
         patch_h = int(patch_size[1])
         patch_w = int(patch_size[2])
         future_delta = input_latents[:, :, 1:] - input_latents[:, :, :-1]
-        delta_batch, delta_channels, delta_frames, delta_h, delta_w = (
-            future_delta.shape
+        delta_batch, delta_channels, delta_frames, delta_h, delta_w = future_delta.shape
+        future_delta_target = (
+            F.unfold(
+                future_delta.permute(0, 2, 1, 3, 4).reshape(
+                    delta_batch * delta_frames,
+                    delta_channels,
+                    delta_h,
+                    delta_w,
+                ),
+                kernel_size=(patch_h, patch_w),
+                stride=(patch_h, patch_w),
+            )
+            .transpose(1, 2)
+            .reshape(
+                delta_batch,
+                -1,
+                delta_channels * patch_h * patch_w,
+            )
+            .contiguous()
         )
-        future_delta_target = F.unfold(
-            future_delta.permute(0, 2, 1, 3, 4).reshape(
-                delta_batch * delta_frames,
-                delta_channels,
-                delta_h,
-                delta_w,
-            ),
-            kernel_size=(patch_h, patch_w),
-            stride=(patch_h, patch_w),
-        ).transpose(1, 2).reshape(
-            delta_batch,
-            -1,
-            delta_channels * patch_h * patch_w,
-        ).contiguous()
     video_frame_timesteps = torch.cat(
         [
             torch.zeros(
@@ -841,19 +889,16 @@ def frame_training_loss(model, sample, tiled: bool = False, global_step: int | N
         rtc_delay = _sample_training_time_rtc_delays(
             batch_size=batch_size,
             action_horizon=action_horizon,
-            max_delay_steps=(
-                model.action_expert.training_time_rtc_max_delay_steps
-            ),
+            max_delay_steps=(model.action_expert.training_time_rtc_max_delay_steps),
             action_is_pad=action_is_pad,
             device=action.device,
         )
-        rtc_prefix_mask = (
-            torch.arange(action_horizon, device=action.device).unsqueeze(0)
-            < rtc_delay.unsqueeze(1)
+        rtc_prefix_mask = torch.arange(action_horizon, device=action.device).unsqueeze(
+            0
+        ) < rtc_delay.unsqueeze(1)
+        action_model_timestep = (
+            timestep_action.unsqueeze(1).expand(batch_size, action_horizon).clone()
         )
-        action_model_timestep = timestep_action.unsqueeze(1).expand(
-            batch_size, action_horizon
-        ).clone()
         action_model_timestep.masked_fill_(rtc_prefix_mask, 0)
         noisy_action = model.train_action_scheduler.add_noise(
             action,
@@ -876,9 +921,7 @@ def frame_training_loss(model, sample, tiled: bool = False, global_step: int | N
         context=video_context,
         context_mask=video_context_mask,
         action=action if model.video_expert.action_conditioned else None,
-        fuse_vae_embedding_in_latents=inputs[
-            "fuse_vae_embedding_in_latents"
-        ],
+        fuse_vae_embedding_in_latents=inputs["fuse_vae_embedding_in_latents"],
     )
     if model.future_delta_enabled:
         model.video_expert.append_future_delta_queries(
@@ -895,9 +938,7 @@ def frame_training_loss(model, sample, tiled: bool = False, global_step: int | N
     video_tokens = video_pre["tokens"]
     action_tokens = action_pre["tokens"]
     tokens_per_frame = int(video_pre["meta"]["tokens_per_frame"])
-    num_future_delta_tokens = int(
-        video_pre["meta"].get("num_future_delta_tokens", 0)
-    )
+    num_future_delta_tokens = int(video_pre["meta"].get("num_future_delta_tokens", 0))
     video_spatial_query_mask = None
     if spatial_token_valid_mask is not None:
         if int(spatial_token_valid_mask.shape[1]) != tokens_per_frame:
@@ -941,15 +982,13 @@ def frame_training_loss(model, sample, tiled: bool = False, global_step: int | N
     else:
         current_pad = image_is_pad[:, :1]
         temporal_factor = int(model.vae.temporal_downsample_factor)
-        future_latent_pad = image_is_pad[:, 1:].reshape(
-            batch_size, -1, temporal_factor
-        ).all(dim=2)
+        future_latent_pad = (
+            image_is_pad[:, 1:].reshape(batch_size, -1, temporal_factor).all(dim=2)
+        )
     video_frame_valid = ~torch.cat(
         [anchor_pad, recent_pad, current_pad, future_latent_pad], dim=1
     )
-    video_key_mask = video_frame_valid.repeat_interleave(
-        tokens_per_frame, dim=1
-    )
+    video_key_mask = video_frame_valid.repeat_interleave(tokens_per_frame, dim=1)
     if num_future_delta_tokens:
         video_key_mask = torch.cat(
             [
@@ -974,9 +1013,7 @@ def frame_training_loss(model, sample, tiled: bool = False, global_step: int | N
         action_step_key_mask = action_valid.any(dim=-1)
     else:
         action_step_key_mask = (
-            torch.ones(
-                action.shape[:2], dtype=torch.bool, device=action_tokens.device
-            )
+            torch.ones(action.shape[:2], dtype=torch.bool, device=action_tokens.device)
             if action_is_pad is None
             else ~action_is_pad
         )
@@ -986,7 +1023,9 @@ def frame_training_loss(model, sample, tiled: bool = False, global_step: int | N
         "mask": action_pre["context_mask"],
     }
 
-    teacher_feature = sample.get("track_teacher_feature") if model.track_bridge is not None else None
+    teacher_feature = (
+        sample.get("track_teacher_feature") if model.track_bridge is not None else None
+    )
     teacher_valid = sample.get("track_teacher_valid")
     track_mask = None
     if model.track_bridge is not None:
@@ -996,9 +1035,14 @@ def frame_training_loss(model, sample, tiled: bool = False, global_step: int | N
             expected = (batch_size, 1, model.track_bridge.teacher_feature_dim)
             if tuple(teacher_feature.shape) != expected:
                 raise ValueError(f"Teacher features must have shape {expected}.")
-            if teacher_valid is None or tuple(teacher_valid.shape) not in {(batch_size,), (batch_size, 1)}:
+            if teacher_valid is None or tuple(teacher_valid.shape) not in {
+                (batch_size,),
+                (batch_size, 1),
+            }:
                 raise ValueError("Teacher validity must have shape [B] or [B,1].")
-            track_mask = teacher_valid.to(device=model.device, dtype=torch.bool).reshape(batch_size)
+            track_mask = teacher_valid.to(
+                device=model.device, dtype=torch.bool
+            ).reshape(batch_size)
             if not track_mask.any():
                 raise ValueError("4D distillation batch has no valid teacher sample.")
 
@@ -1024,8 +1068,7 @@ def frame_training_loss(model, sample, tiled: bool = False, global_step: int | N
     if video_spatial_query_mask is not None:
         if video_context_attention_mask.ndim == 3:
             video_context_attention_mask = (
-                video_context_attention_mask
-                & video_spatial_query_mask[:, :, None]
+                video_context_attention_mask & video_spatial_query_mask[:, :, None]
             )
         elif video_context_attention_mask.ndim == 4:
             video_context_attention_mask = (
@@ -1079,23 +1122,23 @@ def frame_training_loss(model, sample, tiled: bool = False, global_step: int | N
         hidden = semantic_states["video"][model.track_bridge.source_layer]
         if not track_sparse_capture:
             hidden = hidden[track_mask]
-        valid_memory = video_frame_valid[:, :num_condition_frames].repeat_interleave(tokens_per_frame, dim=1)
+        valid_memory = video_frame_valid[:, :num_condition_frames].repeat_interleave(
+            tokens_per_frame, dim=1
+        )
         student = model.track_bridge.encode_video_tokens(
-            hidden, tokens_per_frame=tokens_per_frame,
-            num_condition_frames=num_condition_frames, memory_valid=valid_memory[track_mask],
+            hidden,
+            tokens_per_frame=tokens_per_frame,
+            num_condition_frames=num_condition_frames,
+            memory_valid=valid_memory[track_mask],
         )
         teacher = teacher_feature[track_mask.to(teacher_feature.device)]
         loss_track_raw = model.track_bridge.alignment_loss(student, teacher, None)
         track_weight = model.track_bridge.alignment_weight(global_step)
 
-    pred_video_all = model.video_expert.post_dit(
-        tokens_out["video"], video_pre
-    )
+    pred_video_all = model.video_expert.post_dit(tokens_out["video"], video_pre)
     pred_video = pred_video_all[:, :, num_condition_frames:]
     target_video = target_window[:, :, 1:]
-    pred_action = model.action_expert.post_dit(
-        tokens_out["action"], action_pre
-    )
+    pred_action = model.action_expert.post_dit(tokens_out["action"], action_pre)
     loss_video = _frame_video_loss(
         model,
         pred_video=pred_video,
@@ -1116,9 +1159,7 @@ def frame_training_loss(model, sample, tiled: bool = False, global_step: int | N
         action_dim_loss_weight=action_dim_loss_weight,
         action_loss_weight=action_loss_weight,
         action_loss_weighted_valid_cells=action_loss_weighted_valid_cells,
-        action_loss_weighted_valid_cells_pool=(
-            action_loss_weighted_valid_cells_pool
-        ),
+        action_loss_weighted_valid_cells_pool=(action_loss_weighted_valid_cells_pool),
     )
     loss_future_delta = loss_action.new_zeros(())
     if model.future_delta_enabled:
@@ -1133,9 +1174,7 @@ def frame_training_loss(model, sample, tiled: bool = False, global_step: int | N
             future_delta_valid = (
                 future_delta_valid & spatial_token_valid_mask[:, None, :]
             )
-        future_delta_valid = future_delta_valid.reshape(
-            batch_size, -1
-        )
+        future_delta_valid = future_delta_valid.reshape(batch_size, -1)
         loss_future_delta = _frame_future_delta_loss(
             pred_future_delta=pred_future_delta,
             target_future_delta=future_delta_target,
@@ -1154,21 +1193,15 @@ def frame_training_loss(model, sample, tiled: bool = False, global_step: int | N
             num_condition_frames + future_latent_frames - 1
         ) * tokens_per_frame
         future_end = future_start + tokens_per_frame
-        teacher_hidden = teacher_hidden_all[
-            :, future_start:future_end
-        ].detach()
+        teacher_hidden = teacher_hidden_all[:, future_start:future_end].detach()
         delta_start = int(video_pre["meta"]["real_video_seq_len"])
         delta_end = delta_start + num_future_delta_tokens
         student_hidden = student_hidden_all[:, delta_start:delta_end]
-        semantic_valid = (
-            semantic_active & ~future_latent_pad[:, -1]
-        )[:, None]
+        semantic_valid = (semantic_active & ~future_latent_pad[:, -1])[:, None]
         if spatial_token_valid_mask is not None:
             semantic_valid = semantic_valid & spatial_token_valid_mask
         else:
-            semantic_valid = semantic_valid.expand(
-                -1, int(student_hidden.shape[1])
-            )
+            semantic_valid = semantic_valid.expand(-1, int(student_hidden.shape[1]))
         loss_semantic_future = _frame_semantic_future_loss(
             student_hidden=student_hidden,
             teacher_hidden=teacher_hidden,
@@ -1195,7 +1228,11 @@ def frame_training_loss(model, sample, tiled: bool = False, global_step: int | N
             loss_track=track_weight * loss_track_raw.detach(),
             loss_track_raw=loss_track_raw.detach(),
             track_loss_weight=loss_track_raw.new_tensor(track_weight),
-            track_valid_fraction=(track_mask.float().mean() if track_mask is not None else loss_track_raw.new_zeros(())),
+            track_valid_fraction=(
+                track_mask.float().mean()
+                if track_mask is not None
+                else loss_track_raw.new_zeros(())
+            ),
         )
     if rtc_delay is not None:
         loss_dict["rtc_delay_mean"] = rtc_delay.float().mean().detach()
