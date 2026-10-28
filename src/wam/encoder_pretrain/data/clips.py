@@ -28,7 +28,6 @@ from torch.utils.data import DataLoader, Dataset, Sampler
 from wam.encoder_pretrain.data.catalog import load_or_build_ego_video_catalog
 from wam.encoder_pretrain.data.video import get_frames_by_timestamps
 
-
 REJECTED_VIDEOS_FILENAME = "rejected_videos.json"
 
 
@@ -81,7 +80,11 @@ def _first_text(value: Any) -> str:
 
 
 def _infer_video_key(info: dict[str, Any]) -> str:
-    video_keys = [key for key, feature in info.get("features", {}).items() if feature.get("dtype") == "video"]
+    video_keys = [
+        key
+        for key, feature in info.get("features", {}).items()
+        if feature.get("dtype") == "video"
+    ]
     if len(video_keys) != 1:
         raise ValueError(
             f"video_key must be configured when a dataset has {len(video_keys)} video features: {video_keys}"
@@ -101,7 +104,9 @@ def _resolve_video_key(
         for candidate in video_key_candidates:
             if features.get(str(candidate), {}).get("dtype") == "video":
                 return str(candidate)
-        raise KeyError(f"None of video_key_candidates are video features: {list(video_key_candidates)}")
+        raise KeyError(
+            f"None of video_key_candidates are video features: {list(video_key_candidates)}"
+        )
     return _infer_video_key(info)
 
 
@@ -159,24 +164,32 @@ class EgoVideoClipDataset(Dataset):
         if self.clip_stride <= 0:
             raise ValueError("clip_stride must be positive")
         if self.include_state and not self.state_key:
-            raise ValueError(f"include_state=True for {self.dataset_name}, but no state_key was provided")
+            raise ValueError(
+                f"include_state=True for {self.dataset_name}, but no state_key was provided"
+            )
 
         self.info = self._read_info()
         self.video_key = _resolve_video_key(self.info, video_key, video_key_candidates)
-        self.fps = float(fps if fps is not None else _infer_fps(self.info, self.video_key))
+        self.fps = float(
+            fps if fps is not None else _infer_fps(self.info, self.video_key)
+        )
         self.target_fps = float(target_fps) if target_fps is not None else None
         if self.target_fps is not None and self.target_fps > self.fps:
             raise ValueError(
                 f"target_fps={self.target_fps} exceeds source fps={self.fps} for {self.dataset_name}; "
                 "upsampling would duplicate frames"
             )
-        self.data_path_pattern = self.info.get("data_path", "data/chunk-{chunk_index:03d}/file-{file_index:03d}.parquet")
+        self.data_path_pattern = self.info.get(
+            "data_path", "data/chunk-{chunk_index:03d}/file-{file_index:03d}.parquet"
+        )
         self.video_path_pattern = self.info.get(
             "video_path",
             "videos/{video_key}/chunk-{chunk_index:03d}/file-{file_index:03d}.mp4",
         )
         if self.video_key not in self.info.get("features", {}):
-            raise KeyError(f"{self.video_key!r} is not a feature in {self.dataset_path / 'meta/info.json'}")
+            raise KeyError(
+                f"{self.video_key!r} is not a feature in {self.dataset_path / 'meta/info.json'}"
+            )
 
         self.rejected_video_paths = self._load_rejected_video_paths()
         self.task_map = self._load_task_map()
@@ -236,7 +249,9 @@ class EgoVideoClipDataset(Dataset):
         return 0 if max_start < 0 else max_start // self.clip_stride + 1
 
     def _disjoint_window_slot(self, episode_index: int) -> int:
-        phase = (self._disjoint_seed + episode_index * 2_654_435_761) % self._disjoint_num_buckets
+        phase = (
+            self._disjoint_seed + episode_index * 2_654_435_761
+        ) % self._disjoint_num_buckets
         return (self._disjoint_bucket_index + phase) % self._disjoint_num_buckets
 
     def _episode_clip_count(self, episode_index: int, source_length: int) -> int:
@@ -248,13 +263,18 @@ class EgoVideoClipDataset(Dataset):
         max_start = self._sampling_length(source_length) - self._required_span
         if max_start < first_start:
             return 0
-        return (max_start - first_start) // (window_span * self._disjoint_num_buckets) + 1
+        return (max_start - first_start) // (
+            window_span * self._disjoint_num_buckets
+        ) + 1
 
     def _episode_clip_start(self, episode_index: int, local_clip_index: int) -> int:
         window_span = getattr(self, "_disjoint_window_span", None)
         if window_span is None:
             return local_clip_index * self.clip_stride
-        window_index = self._disjoint_window_slot(episode_index) + local_clip_index * self._disjoint_num_buckets
+        window_index = (
+            self._disjoint_window_slot(episode_index)
+            + local_clip_index * self._disjoint_num_buckets
+        )
         return window_index * window_span
 
     def _episode_files(self) -> list[Path]:
@@ -316,10 +336,15 @@ class EgoVideoClipDataset(Dataset):
                     continue
                 video_path = self.dataset_path / relative_video_path
 
-                lang = _first_text(row.get("task_descriptions")) or _first_text(row.get("tasks"))
+                lang = _first_text(row.get("task_descriptions")) or _first_text(
+                    row.get("tasks")
+                )
                 if not lang and self.task_map:
                     task_texts = row.get("tasks")
-                    if isinstance(task_texts, (list, tuple, np.ndarray)) and len(task_texts) > 0:
+                    if (
+                        isinstance(task_texts, (list, tuple, np.ndarray))
+                        and len(task_texts) > 0
+                    ):
                         lang = _first_text(task_texts[0])
                 if not lang:
                     lang = self.dataset_name
@@ -329,14 +354,25 @@ class EgoVideoClipDataset(Dataset):
                     "length": length,
                     "data_chunk_index": int(row["data/chunk_index"]),
                     "data_file_index": int(row["data/file_index"]),
-                    "dataset_from_index": int(row["dataset_from_index"]) if "dataset_from_index" in row else None,
-                    "dataset_to_index": int(row["dataset_to_index"]) if "dataset_to_index" in row else None,
+                    "dataset_from_index": (
+                        int(row["dataset_from_index"])
+                        if "dataset_from_index" in row
+                        else None
+                    ),
+                    "dataset_to_index": (
+                        int(row["dataset_to_index"])
+                        if "dataset_to_index" in row
+                        else None
+                    ),
                     "video_chunk_index": video_chunk_index,
                     "video_file_index": video_file_index,
-                    "video_from_timestamp": float(row[f"{video_prefix}/from_timestamp"]),
+                    "video_from_timestamp": float(
+                        row[f"{video_prefix}/from_timestamp"]
+                    ),
                     "video_to_timestamp": (
                         float(row[f"{video_prefix}/to_timestamp"])
-                        if f"{video_prefix}/to_timestamp" in row and row[f"{video_prefix}/to_timestamp"] is not None
+                        if f"{video_prefix}/to_timestamp" in row
+                        and row[f"{video_prefix}/to_timestamp"] is not None
                         else None
                     ),
                     "video_path": video_path,
@@ -350,7 +386,9 @@ class EgoVideoClipDataset(Dataset):
                 f"No valid clips found for {self.dataset_name}. "
                 f"Check clip_len={self.clip_len}, frame_stride={self.frame_stride}, and video_key={self.video_key!r}."
             )
-        self._clip_cumulative_counts = np.cumsum(np.asarray(clip_counts, dtype=np.int64), dtype=np.int64)
+        self._clip_cumulative_counts = np.cumsum(
+            np.asarray(clip_counts, dtype=np.int64), dtype=np.int64
+        )
 
     def _rebuild_clip_index(self) -> None:
         """Build an episode-level prefix sum instead of materializing every clip."""
@@ -371,8 +409,14 @@ class EgoVideoClipDataset(Dataset):
             index += size
         if index < 0 or index >= size:
             raise IndexError(index)
-        episode_index = int(np.searchsorted(self._clip_cumulative_counts, index, side="right"))
-        previous = 0 if episode_index == 0 else int(self._clip_cumulative_counts[episode_index - 1])
+        episode_index = int(
+            np.searchsorted(self._clip_cumulative_counts, index, side="right")
+        )
+        previous = (
+            0
+            if episode_index == 0
+            else int(self._clip_cumulative_counts[episode_index - 1])
+        )
         clip_start = self._episode_clip_start(episode_index, index - previous)
         return episode_index, clip_start
 
@@ -400,7 +444,9 @@ class EgoVideoClipDataset(Dataset):
 
         data = self._cached_data_frame
         assert data is not None
-        episode_data = data.loc[data["episode_index"] == episode["episode_index"]].copy()
+        episode_data = data.loc[
+            data["episode_index"] == episode["episode_index"]
+        ].copy()
         if "frame_index" in episode_data.columns:
             episode_data = episode_data.sort_values("frame_index")
         return episode_data.reset_index(drop=True)
@@ -422,8 +468,13 @@ class EgoVideoClipDataset(Dataset):
         frame_positions = np.arange(self.clip_len, dtype=np.int64) * self.frame_stride
         sample_indices = clip_start + frame_positions
         sampling_fps = self.target_fps or self.fps
-        timestamps = episode["video_from_timestamp"] + sample_indices.astype(np.float64) / sampling_fps
-        frame_indices = np.rint(sample_indices.astype(np.float64) * self.fps / sampling_fps).astype(np.int64)
+        timestamps = (
+            episode["video_from_timestamp"]
+            + sample_indices.astype(np.float64) / sampling_fps
+        )
+        frame_indices = np.rint(
+            sample_indices.astype(np.float64) * self.fps / sampling_fps
+        ).astype(np.int64)
 
         frames = get_frames_by_timestamps(
             str(episode["video_path"]),
@@ -432,7 +483,9 @@ class EgoVideoClipDataset(Dataset):
             video_backend_kwargs=getattr(self, "video_backend_kwargs", {}),
         )
         if frames.shape[0] != self.clip_len:
-            raise RuntimeError(f"Expected {self.clip_len} frames from {episode['video_path']}, got {frames.shape[0]}")
+            raise RuntimeError(
+                f"Expected {self.clip_len} frames from {episode['video_path']}, got {frames.shape[0]}"
+            )
 
         sample = {
             "frames": self._frames_to_pil(frames),
@@ -461,9 +514,13 @@ class EgoVideoClipDataset(Dataset):
             episode_data = self._load_episode_data(episode)
             selected = episode_data.iloc[frame_indices]
             if self.include_action:
-                sample["action"] = np.stack(selected[self.action_key].to_numpy()).astype(np.float32)
+                sample["action"] = np.stack(
+                    selected[self.action_key].to_numpy()
+                ).astype(np.float32)
             if self.include_state and self.state_key:
-                sample["state"] = np.stack(selected[self.state_key].to_numpy()).astype(np.float32)
+                sample["state"] = np.stack(selected[self.state_key].to_numpy()).astype(
+                    np.float32
+                )
 
         return sample
 
@@ -520,14 +577,25 @@ class EgoVideoCollectionDataset(Dataset):
 
     def __init__(self, dataset_name: str, datasets: list[EgoVideoClipDataset]) -> None:
         if not datasets:
-            raise ValueError(f"Ego-video collection {dataset_name!r} requires at least one physical dataset")
+            raise ValueError(
+                f"Ego-video collection {dataset_name!r} requires at least one physical dataset"
+            )
         self.dataset_name = str(dataset_name)
         self.datasets = datasets
-        self._cumulative_lengths = np.cumsum([len(dataset) for dataset in datasets], dtype=np.int64)
+        self._cumulative_lengths = np.cumsum(
+            [len(dataset) for dataset in datasets], dtype=np.int64
+        )
         self.num_episodes = sum(len(dataset.episodes) for dataset in datasets)
-        self.total_frames = sum(int(episode["length"]) for dataset in datasets for episode in dataset.episodes)
+        self.total_frames = sum(
+            int(episode["length"])
+            for dataset in datasets
+            for episode in dataset.episodes
+        )
         self.duration_hours = sum(
-            sum(int(episode["length"]) for episode in dataset.episodes) / dataset.fps / 3600.0 for dataset in datasets
+            sum(int(episode["length"]) for episode in dataset.episodes)
+            / dataset.fps
+            / 3600.0
+            for dataset in datasets
         )
         self.fps = datasets[0].fps
         self.target_fps = datasets[0].target_fps
@@ -539,28 +607,48 @@ class EgoVideoCollectionDataset(Dataset):
 
     def __getitem__(self, index: int) -> dict[str, Any]:
         dataset_index = bisect_right(self._cumulative_lengths, index)
-        previous = 0 if dataset_index == 0 else int(self._cumulative_lengths[dataset_index - 1])
+        previous = (
+            0
+            if dataset_index == 0
+            else int(self._cumulative_lengths[dataset_index - 1])
+        )
         return self.datasets[dataset_index][index - previous]
 
-    def with_clip_spec(self, clip_len: int, frame_stride: int) -> "EgoVideoCollectionDataset":
+    def with_clip_spec(
+        self, clip_len: int, frame_stride: int
+    ) -> "EgoVideoCollectionDataset":
         return type(self)(
             self.dataset_name,
-            [dataset.with_clip_spec(clip_len, frame_stride) for dataset in self.datasets],
+            [
+                dataset.with_clip_spec(clip_len, frame_stride)
+                for dataset in self.datasets
+            ],
         )
 
-    def with_disjoint_clip_spec(self, clip_len: int, frame_stride: int, **kwargs: Any) -> "EgoVideoCollectionDataset":
+    def with_disjoint_clip_spec(
+        self, clip_len: int, frame_stride: int, **kwargs: Any
+    ) -> "EgoVideoCollectionDataset":
         return type(self)(
             self.dataset_name,
-            [dataset.with_disjoint_clip_spec(clip_len, frame_stride, **kwargs) for dataset in self.datasets],
+            [
+                dataset.with_disjoint_clip_spec(clip_len, frame_stride, **kwargs)
+                for dataset in self.datasets
+            ],
         )
 
 
 def _expand_dataset_route(route: Any, fallback: Any, data_root_dir: Path) -> list[Path]:
-    root = _as_path(route.get("path", fallback.get("path", data_root_dir / str(fallback.name))))
+    root = _as_path(
+        route.get("path", fallback.get("path", data_root_dir / str(fallback.name)))
+    )
     patterns = route.get("subdatasets", fallback.get("subdatasets", None))
-    excluded = set(route.get("exclude_subdatasets", fallback.get("exclude_subdatasets", [])))
+    excluded = set(
+        route.get("exclude_subdatasets", fallback.get("exclude_subdatasets", []))
+    )
     skip_empty = bool(route.get("skip_empty", fallback.get("skip_empty", False)))
-    require_success = bool(route.get("require_success", fallback.get("require_success", False)))
+    require_success = bool(
+        route.get("require_success", fallback.get("require_success", False))
+    )
     include_root = bool(route.get("include_root", fallback.get("include_root", False)))
 
     def route_ready(path: Path) -> bool:
@@ -568,7 +656,9 @@ def _expand_dataset_route(route: Any, fallback: Any, data_root_dir: Path) -> lis
             return False
         if not require_success:
             return True
-        return (path / "_SUCCESS").is_file() and any((path / "meta/episodes").glob("chunk-*/*.parquet"))
+        return (path / "_SUCCESS").is_file() and any(
+            (path / "meta/episodes").glob("chunk-*/*.parquet")
+        )
 
     if patterns is None:
         if require_success and not route_ready(root):
@@ -596,7 +686,11 @@ def _entry_dataset_paths(entry: Any, data_root_dir: Path) -> list[Path]:
     routes = entry.get("paths", None)
     if routes is None:
         return _expand_dataset_route(entry, entry, data_root_dir)
-    return [path for route in routes for path in _expand_dataset_route(route, entry, data_root_dir)]
+    return [
+        path
+        for route in routes
+        for path in _expand_dataset_route(route, entry, data_root_dir)
+    ]
 
 
 def _parquet_columns(path: Path) -> set[str]:
@@ -608,7 +702,9 @@ def _parquet_columns(path: Path) -> set[str]:
         return set(pd.read_parquet(path).columns)
 
 
-def _preflight_dataset_entries(data_cfg: Any, only_dataset: str | None) -> list[tuple[Any, list[Path]]]:
+def _preflight_dataset_entries(
+    data_cfg: Any, only_dataset: str | None
+) -> list[tuple[Any, list[Path]]]:
     """Validate every selected physical dataset before any clip catalog is built."""
 
     data_root_dir = _as_path(data_cfg.data_root_dir)
@@ -636,10 +732,14 @@ def _preflight_dataset_entries(data_cfg: Any, only_dataset: str | None) -> list[
                     f"target_fps={target_fps} exceeds source fps={fps} for {entry.name} at {dataset_path}"
                 )
 
-            episode_files = sorted((dataset_path / "meta/episodes").glob("chunk-*/*.parquet"))
+            episode_files = sorted(
+                (dataset_path / "meta/episodes").glob("chunk-*/*.parquet")
+            )
             if not episode_files:
                 episode_root = dataset_path / "meta/episodes"
-                raise FileNotFoundError(f"No LeRobot v3 episode parquet files found under {episode_root}")
+                raise FileNotFoundError(
+                    f"No LeRobot v3 episode parquet files found under {episode_root}"
+                )
             video_prefix = f"videos/{video_key}"
             required_columns = {
                 "episode_index",
@@ -652,7 +752,9 @@ def _preflight_dataset_entries(data_cfg: Any, only_dataset: str | None) -> list[
             }
             missing = sorted(required_columns - _parquet_columns(episode_files[0]))
             if missing:
-                raise KeyError(f"{episode_files[0]} is missing required columns: {missing}")
+                raise KeyError(
+                    f"{episode_files[0]} is missing required columns: {missing}"
+                )
         selected.append((entry, dataset_paths))
 
     if not selected:
@@ -663,14 +765,20 @@ def _preflight_dataset_entries(data_cfg: Any, only_dataset: str | None) -> list[
 class EgoVideoMixtureDataset(Dataset):
     """A deterministic concatenation of multiple ego-video clip datasets."""
 
-    def __init__(self, datasets: list[EgoVideoClipDataset | EgoVideoCollectionDataset]) -> None:
+    def __init__(
+        self, datasets: list[EgoVideoClipDataset | EgoVideoCollectionDataset]
+    ) -> None:
         if not datasets:
             raise ValueError("EgoVideoMixtureDataset requires at least one dataset")
         self.datasets = datasets
-        self._cumulative_lengths = np.cumsum([len(dataset) for dataset in datasets], dtype=np.int64)
+        self._cumulative_lengths = np.cumsum(
+            [len(dataset) for dataset in datasets], dtype=np.int64
+        )
 
     @classmethod
-    def from_config(cls, data_cfg: Any, only_dataset: str | None = None) -> "EgoVideoMixtureDataset":
+    def from_config(
+        cls, data_cfg: Any, only_dataset: str | None = None
+    ) -> "EgoVideoMixtureDataset":
         dataset_entries = data_cfg.get("datasets", None)
         if dataset_entries is None:
             raise ValueError("ego_video_data.datasets must be configured")
@@ -684,14 +792,22 @@ class EgoVideoMixtureDataset(Dataset):
         global_backend_kwargs = dict(data_cfg.get("video_backend_kwargs", {}))
         for source in dataset.datasets:
             entry = entries[source.dataset_name]
-            backend_kwargs = global_backend_kwargs | dict(entry.get("video_backend_kwargs", {}))
-            physical_datasets = source.datasets if isinstance(source, EgoVideoCollectionDataset) else [source]
+            backend_kwargs = global_backend_kwargs | dict(
+                entry.get("video_backend_kwargs", {})
+            )
+            physical_datasets = (
+                source.datasets
+                if isinstance(source, EgoVideoCollectionDataset)
+                else [source]
+            )
             for physical_dataset in physical_datasets:
                 physical_dataset.video_backend_kwargs = backend_kwargs
         return dataset
 
     @classmethod
-    def _from_config_uncached(cls, data_cfg: Any, only_dataset: str | None) -> "EgoVideoMixtureDataset":
+    def _from_config_uncached(
+        cls, data_cfg: Any, only_dataset: str | None
+    ) -> "EgoVideoMixtureDataset":
         """Build the catalog from source metadata after cache policy is resolved."""
 
         datasets: list[EgoVideoClipDataset] = []
@@ -705,19 +821,33 @@ class EgoVideoMixtureDataset(Dataset):
                     video_key=entry.get("video_key", None),
                     video_key_candidates=entry.get("video_key_candidates", None),
                     fps=entry.get("fps", None),
-                    target_fps=entry.get("target_fps", data_cfg.get("target_fps", None)),
+                    target_fps=entry.get(
+                        "target_fps", data_cfg.get("target_fps", None)
+                    ),
                     clip_len=entry.get("clip_len", data_cfg.get("clip_len", 8)),
-                    frame_stride=entry.get("frame_stride", data_cfg.get("frame_stride", 1)),
-                    clip_stride=entry.get("clip_stride", data_cfg.get("clip_stride", 1)),
+                    frame_stride=entry.get(
+                        "frame_stride", data_cfg.get("frame_stride", 1)
+                    ),
+                    clip_stride=entry.get(
+                        "clip_stride", data_cfg.get("clip_stride", 1)
+                    ),
                     resize=entry.get("resize", data_cfg.get("resize", [224, 224])),
-                    video_backend=entry.get("video_backend", data_cfg.get("video_backend", "decord")),
+                    video_backend=entry.get(
+                        "video_backend", data_cfg.get("video_backend", "decord")
+                    ),
                     video_backend_kwargs=(
                         dict(data_cfg.get("video_backend_kwargs", {}))
                         | dict(entry.get("video_backend_kwargs", {}))
                     ),
-                    include_action=entry.get("include_action", data_cfg.get("include_action", False)),
-                    include_state=entry.get("include_state", data_cfg.get("include_state", False)),
-                    action_key=entry.get("action_key", data_cfg.get("action_key", "action")),
+                    include_action=entry.get(
+                        "include_action", data_cfg.get("include_action", False)
+                    ),
+                    include_state=entry.get(
+                        "include_state", data_cfg.get("include_state", False)
+                    ),
+                    action_key=entry.get(
+                        "action_key", data_cfg.get("action_key", "action")
+                    ),
                     state_key=entry.get("state_key", data_cfg.get("state_key", None)),
                 )
                 for dataset_path in dataset_paths
@@ -735,15 +865,31 @@ class EgoVideoMixtureDataset(Dataset):
 
     def __getitem__(self, index: int) -> dict[str, Any]:
         dataset_index = bisect_right(self._cumulative_lengths, index)
-        previous = 0 if dataset_index == 0 else int(self._cumulative_lengths[dataset_index - 1])
+        previous = (
+            0
+            if dataset_index == 0
+            else int(self._cumulative_lengths[dataset_index - 1])
+        )
         return self.datasets[dataset_index][index - previous]
 
-    def with_clip_spec(self, clip_len: int, frame_stride: int) -> "EgoVideoMixtureDataset":
-        return type(self)([dataset.with_clip_spec(clip_len, frame_stride) for dataset in self.datasets])
-
-    def with_disjoint_clip_spec(self, clip_len: int, frame_stride: int, **kwargs: Any) -> "EgoVideoMixtureDataset":
+    def with_clip_spec(
+        self, clip_len: int, frame_stride: int
+    ) -> "EgoVideoMixtureDataset":
         return type(self)(
-            [dataset.with_disjoint_clip_spec(clip_len, frame_stride, **kwargs) for dataset in self.datasets]
+            [
+                dataset.with_clip_spec(clip_len, frame_stride)
+                for dataset in self.datasets
+            ]
+        )
+
+    def with_disjoint_clip_spec(
+        self, clip_len: int, frame_stride: int, **kwargs: Any
+    ) -> "EgoVideoMixtureDataset":
+        return type(self)(
+            [
+                dataset.with_disjoint_clip_spec(clip_len, frame_stride, **kwargs)
+                for dataset in self.datasets
+            ]
         )
 
 
@@ -773,7 +919,9 @@ class _BlockShuffleCursor:
 
     def _current_block(self) -> tuple[int, int, torch.Tensor]:
         if self._block_order is None:
-            self._block_order = torch.randperm(self.num_blocks, generator=self._generator(17))
+            self._block_order = torch.randperm(
+                self.num_blocks, generator=self._generator(17)
+            )
         block_index = int(self._block_order[self.block_position])
         block_start = block_index * self.block_size
         block_length = min(self.block_size, self.size - block_start)
@@ -801,7 +949,9 @@ class _BlockShuffleCursor:
         while remaining:
             block_start, block_length, permutation = self._current_block()
             take = min(remaining, block_length - self.block_offset)
-            parts.append(permutation[self.block_offset : self.block_offset + take] + block_start)
+            parts.append(
+                permutation[self.block_offset : self.block_offset + take] + block_start
+            )
             self.block_offset += take
             remaining -= take
             if self.block_offset == block_length:
@@ -818,7 +968,10 @@ class _BlockShuffleCursor:
         }
 
     def load_state_dict(self, state: dict[str, int]) -> None:
-        if int(state["size"]) != self.size or int(state["block_size"]) != self.block_size:
+        if (
+            int(state["size"]) != self.size
+            or int(state["block_size"]) != self.block_size
+        ):
             raise ValueError(
                 "Block-shuffle cursor shape differs from checkpoint: "
                 f"checkpoint=(size={state['size']}, block_size={state['block_size']}), "
@@ -857,11 +1010,15 @@ class _PrefetchTrackedBatchSampler:
     def mark_consumed(self, count: int = 1) -> None:
         for _ in range(int(count)):
             if not self._pending_states:
-                raise RuntimeError("Sampler consumption advanced beyond its prefetched state queue")
+                raise RuntimeError(
+                    "Sampler consumption advanced beyond its prefetched state queue"
+                )
             self._committed_state = self._pending_states.popleft()
 
     def state_dict(self) -> dict[str, Any]:
-        state = self._committed_state if self._prefetch_tracking else self._snapshot_state()
+        state = (
+            self._committed_state if self._prefetch_tracking else self._snapshot_state()
+        )
         assert state is not None
         return copy.deepcopy(state)
 
@@ -888,20 +1045,28 @@ class BalancedDatasetBatchSampler(_PrefetchTrackedBatchSampler, Sampler[list[int
         seed: int = 42,
     ) -> None:
         self.dataset_sizes = [len(source) for source in dataset.datasets]
-        self.dataset_offsets = [0, *[int(value) for value in dataset._cumulative_lengths[:-1]]]
+        self.dataset_offsets = [
+            0,
+            *[int(value) for value in dataset._cumulative_lengths[:-1]],
+        ]
         self.num_sources = len(self.dataset_sizes)
         self.batch_size = int(batch_size)
         if self.batch_size % self.num_sources:
-            raise ValueError(f"Balanced batch_size={self.batch_size} must be divisible by {self.num_sources} datasets")
+            raise ValueError(
+                f"Balanced batch_size={self.batch_size} must be divisible by {self.num_sources} datasets"
+            )
         self.samples_per_source = self.batch_size // self.num_sources
         self.num_batches = max(
-            (size + self.samples_per_source - 1) // self.samples_per_source for size in self.dataset_sizes
+            (size + self.samples_per_source - 1) // self.samples_per_source
+            for size in self.dataset_sizes
         )
         self.seed = int(seed)
         self.epoch = 0
         self.batch_offset = 0
         self.cursors = [
-            _BlockShuffleCursor(size, shuffle_block_size, self.seed + source_index * 10_009)
+            _BlockShuffleCursor(
+                size, shuffle_block_size, self.seed + source_index * 10_009
+            )
             for source_index, size in enumerate(self.dataset_sizes)
         ]
         self._init_prefetch_tracking()
@@ -913,7 +1078,8 @@ class BalancedDatasetBatchSampler(_PrefetchTrackedBatchSampler, Sampler[list[int
         for batch_index in range(self.batch_offset, self.num_batches):
             batch = torch.cat(
                 [
-                    cursor.take(self.samples_per_source) + self.dataset_offsets[source_index]
+                    cursor.take(self.samples_per_source)
+                    + self.dataset_offsets[source_index]
                     for source_index, cursor in enumerate(self.cursors)
                 ]
             ).tolist()
@@ -933,7 +1099,9 @@ class BalancedDatasetBatchSampler(_PrefetchTrackedBatchSampler, Sampler[list[int
 
     def _restore_state(self, state: dict[str, Any]) -> None:
         if state.get("format") != "block_shuffle.v1":
-            raise ValueError(f"Unsupported balanced sampler state: {state.get('format')}")
+            raise ValueError(
+                f"Unsupported balanced sampler state: {state.get('format')}"
+            )
         if len(state["cursors"]) != len(self.cursors):
             raise ValueError(
                 f"Checkpoint has {len(state['cursors'])} source cursors, current sampler has {len(self.cursors)}"
@@ -957,9 +1125,14 @@ class TemperatureDatasetBatchSampler(_PrefetchTrackedBatchSampler, Sampler[list[
         seed: int = 42,
     ) -> None:
         self.dataset_sizes = [len(source) for source in dataset.datasets]
-        self.dataset_offsets = [0, *[int(value) for value in dataset._cumulative_lengths[:-1]]]
+        self.dataset_offsets = [
+            0,
+            *[int(value) for value in dataset._cumulative_lengths[:-1]],
+        ]
         if dataset_weights is None:
-            weights = np.asarray(self.dataset_sizes, dtype=np.float64) ** float(temperature)
+            weights = np.asarray(self.dataset_sizes, dtype=np.float64) ** float(
+                temperature
+            )
         else:
             if len(dataset_weights) != len(self.dataset_sizes):
                 raise ValueError(
@@ -971,7 +1144,9 @@ class TemperatureDatasetBatchSampler(_PrefetchTrackedBatchSampler, Sampler[list[
             raise ValueError("All non-empty dataset sampling weights must be positive")
         weights[sizes == 0] = 0.0
         if weights.sum() <= 0:
-            raise ValueError("Temperature sampling requires at least one non-empty dataset")
+            raise ValueError(
+                "Temperature sampling requires at least one non-empty dataset"
+            )
         self.probabilities = torch.tensor(weights / weights.sum(), dtype=torch.float64)
         self.batch_size = int(batch_size)
         self.num_batches = math.ceil(sum(self.dataset_sizes) / self.batch_size)
@@ -979,7 +1154,13 @@ class TemperatureDatasetBatchSampler(_PrefetchTrackedBatchSampler, Sampler[list[
         self.epoch = 0
         self.batch_offset = 0
         self.cursors = [
-            _BlockShuffleCursor(size, shuffle_block_size, self.seed + source_index * 10_009) if size else None
+            (
+                _BlockShuffleCursor(
+                    size, shuffle_block_size, self.seed + source_index * 10_009
+                )
+                if size
+                else None
+            )
             for source_index, size in enumerate(self.dataset_sizes)
         ]
         self._init_prefetch_tracking()
@@ -989,7 +1170,9 @@ class TemperatureDatasetBatchSampler(_PrefetchTrackedBatchSampler, Sampler[list[
 
     def __iter__(self):
         for batch_index in range(self.batch_offset, self.num_batches):
-            generator = torch.Generator().manual_seed(self.seed + self.epoch * 1_000_003 + batch_index)
+            generator = torch.Generator().manual_seed(
+                self.seed + self.epoch * 1_000_003 + batch_index
+            )
             sources = torch.multinomial(
                 self.probabilities,
                 self.batch_size,
@@ -998,10 +1181,14 @@ class TemperatureDatasetBatchSampler(_PrefetchTrackedBatchSampler, Sampler[list[
             )
             batch = torch.empty(self.batch_size, dtype=torch.long)
             for source_index, cursor in enumerate(self.cursors):
-                positions = torch.nonzero(sources == source_index, as_tuple=False).flatten()
+                positions = torch.nonzero(
+                    sources == source_index, as_tuple=False
+                ).flatten()
                 if len(positions):
                     assert cursor is not None
-                    batch[positions] = cursor.take(len(positions)) + self.dataset_offsets[source_index]
+                    batch[positions] = (
+                        cursor.take(len(positions)) + self.dataset_offsets[source_index]
+                    )
             self.batch_offset = batch_index + 1
             self._record_yielded_state()
             yield batch.tolist()
@@ -1013,12 +1200,17 @@ class TemperatureDatasetBatchSampler(_PrefetchTrackedBatchSampler, Sampler[list[
             "format": "block_shuffle.v1",
             "epoch": self.epoch,
             "batch_offset": self.batch_offset,
-            "cursors": [cursor.state_dict() if cursor is not None else None for cursor in self.cursors],
+            "cursors": [
+                cursor.state_dict() if cursor is not None else None
+                for cursor in self.cursors
+            ],
         }
 
     def _restore_state(self, state: dict[str, Any]) -> None:
         if state.get("format") != "block_shuffle.v1":
-            raise ValueError(f"Unsupported temperature sampler state: {state.get('format')}")
+            raise ValueError(
+                f"Unsupported temperature sampler state: {state.get('format')}"
+            )
         if len(state["cursors"]) != len(self.cursors):
             raise ValueError(
                 f"Checkpoint has {len(state['cursors'])} source cursors, current sampler has {len(self.cursors)}"
@@ -1046,7 +1238,9 @@ class BucketedEgoVideoDataset(Dataset):
         return self.datasets[key][int(index)]
 
 
-class SharedBucketBatchSampler(_PrefetchTrackedBatchSampler, Sampler[list[tuple[tuple[int, int], int]]]):
+class SharedBucketBatchSampler(
+    _PrefetchTrackedBatchSampler, Sampler[list[tuple[tuple[int, int], int]]]
+):
     """Schedule homogeneous bucket batches through one shared worker pool.
 
     Accelerate shards non-split batch samplers by consuming ``world_size``
@@ -1065,11 +1259,15 @@ class SharedBucketBatchSampler(_PrefetchTrackedBatchSampler, Sampler[list[tuple[
         if not samplers:
             raise ValueError("At least one bucket sampler is required")
         if set(samplers) != set(bucket_probabilities):
-            raise ValueError("Bucket samplers and probabilities must have identical keys")
+            raise ValueError(
+                "Bucket samplers and probabilities must have identical keys"
+            )
         if world_size <= 0:
             raise ValueError("world_size must be positive")
         total_probability = sum(float(value) for value in bucket_probabilities.values())
-        if total_probability <= 0 or any(float(value) <= 0 for value in bucket_probabilities.values()):
+        if total_probability <= 0 or any(
+            float(value) <= 0 for value in bucket_probabilities.values()
+        ):
             raise ValueError("Bucket probabilities must be positive")
 
         self.samplers = dict(samplers)
@@ -1077,13 +1275,17 @@ class SharedBucketBatchSampler(_PrefetchTrackedBatchSampler, Sampler[list[tuple[
             if hasattr(sampler, "enable_prefetch_tracking"):
                 sampler.enable_prefetch_tracking()
         self.bucket_probabilities = {
-            key: float(value) / total_probability for key, value in bucket_probabilities.items()
+            key: float(value) / total_probability
+            for key, value in bucket_probabilities.items()
         }
         self.world_size = int(world_size)
         self.seed = int(seed)
         self.logical_step = 0
         self.rank_slot = 0
-        self.num_logical_steps = sum(math.ceil(len(sampler) / self.world_size) for sampler in self.samplers.values())
+        self.num_logical_steps = sum(
+            math.ceil(len(sampler) / self.world_size)
+            for sampler in self.samplers.values()
+        )
         self._iterators: dict[tuple[int, int], Any] = {}
         self._init_prefetch_tracking()
 
@@ -1144,7 +1346,9 @@ class SharedBucketBatchSampler(_PrefetchTrackedBatchSampler, Sampler[list[tuple[
 
     def _restore_state(self, state: dict[str, Any]) -> None:
         if state.get("format") != "shared_bucket_sampler.v1":
-            raise ValueError(f"Unsupported shared bucket sampler state: {state.get('format')}")
+            raise ValueError(
+                f"Unsupported shared bucket sampler state: {state.get('format')}"
+            )
         if int(state["world_size"]) != self.world_size:
             raise ValueError(
                 f"Sampler world_size={state['world_size']} differs from current world_size={self.world_size}"
@@ -1172,7 +1376,9 @@ class SharedBucketBatchSampler(_PrefetchTrackedBatchSampler, Sampler[list[tuple[
 def _select_ego_video_cfg(cfg: Any) -> Any:
     datasets_cfg = cfg.datasets
     if "ego_video_data" not in datasets_cfg:
-        raise KeyError("datasets.ego_video_data must be configured for ego-video dataloading")
+        raise KeyError(
+            "datasets.ego_video_data must be configured for ego-video dataloading"
+        )
     return datasets_cfg.ego_video_data
 
 
@@ -1190,7 +1396,9 @@ def make_ego_video_dataloader(cfg: Any, only_dataset: str | None = None) -> Data
         "drop_last": bool(data_cfg.get("drop_last", False)),
     }
     if num_workers > 0:
-        dataloader_kwargs["persistent_workers"] = bool(data_cfg.get("persistent_workers", False))
+        dataloader_kwargs["persistent_workers"] = bool(
+            data_cfg.get("persistent_workers", False)
+        )
         dataloader_kwargs["prefetch_factor"] = int(data_cfg.get("prefetch_factor", 2))
 
     return DataLoader(dataset, **dataloader_kwargs)
@@ -1234,7 +1442,9 @@ class UniformClipBucketLoaders:
         self.seed = int(seed)
         self.iterators: dict[tuple[int, int], Any] = {}
         self.stateful_samplers = {
-            key: sampler for key, sampler in (stateful_samplers or {}).items() if key in self.loaders
+            key: sampler
+            for key, sampler in (stateful_samplers or {}).items()
+            if key in self.loaders
         }
         for sampler in self.stateful_samplers.values():
             if hasattr(sampler, "enable_prefetch_tracking"):
@@ -1242,7 +1452,9 @@ class UniformClipBucketLoaders:
         self.length_probability_map = dict(length_probabilities or {})
         self.stride_probability_map = dict(stride_probabilities or {})
         self.bucket_weight_map = {
-            key: float(weight) for key, weight in (bucket_weights or {}).items() if key in self.loaders
+            key: float(weight)
+            for key, weight in (bucket_weights or {}).items()
+            if key in self.loaders
         }
         self.length_probabilities = self._marginal(self.lengths, length_probabilities)
         self.stride_probabilities = self._marginal(self.strides, stride_probabilities)
@@ -1255,11 +1467,16 @@ class UniformClipBucketLoaders:
     @staticmethod
     def _marginal(values: list[int], configured: dict[int, float] | None) -> np.ndarray:
         weights = np.asarray(
-            [1.0 if configured is None else float(configured[value]) for value in values],
+            [
+                1.0 if configured is None else float(configured[value])
+                for value in values
+            ],
             dtype=np.float64,
         )
         if np.any(weights <= 0):
-            raise ValueError(f"Bucket probabilities must be positive, got {weights.tolist()}")
+            raise ValueError(
+                f"Bucket probabilities must be positive, got {weights.tolist()}"
+            )
         return weights / weights.sum()
 
     def state_dict(self) -> dict[str, object]:
@@ -1285,7 +1502,9 @@ class UniformClipBucketLoaders:
                 if (length, stride) in self.loaders:
                     matrix[row, column] = 1.0
         if np.any(matrix.sum(axis=1) == 0) or np.any(matrix.sum(axis=0) == 0):
-            raise ValueError("Every configured length and stride bucket needs at least one valid pair")
+            raise ValueError(
+                "Every configured length and stride bucket needs at least one valid pair"
+            )
 
         target_rows = self.length_probabilities
         target_columns = self.stride_probabilities
@@ -1303,10 +1522,14 @@ class UniformClipBucketLoaders:
             if matrix[row, column] > 0
         }
 
-    def _weighted_probabilities(self, weights: dict[tuple[int, int], float]) -> dict[tuple[int, int], float]:
+    def _weighted_probabilities(
+        self, weights: dict[tuple[int, int], float]
+    ) -> dict[tuple[int, int], float]:
         missing = self.loaders.keys() - weights.keys()
         if missing:
-            raise ValueError(f"Missing explicit weights for clip buckets: {sorted(missing)}")
+            raise ValueError(
+                f"Missing explicit weights for clip buckets: {sorted(missing)}"
+            )
         if any(weight <= 0 for weight in weights.values()):
             raise ValueError(f"Clip bucket weights must be positive, got {weights}")
         total = sum(weights.values())
@@ -1389,7 +1612,11 @@ class SharedClipBucketLoader:
         if isinstance(iterator, GeneratorType):
             iterator.close()
             self.loader.end()
-        worker_loader = self.loader.base_dataloader if hasattr(self.loader, "base_dataloader") else self.loader
+        worker_loader = (
+            self.loader.base_dataloader
+            if hasattr(self.loader, "base_dataloader")
+            else self.loader
+        )
         worker_iterator = worker_loader._iterator
         assert worker_iterator is not None
         worker_iterator._shutdown_workers()
@@ -1411,16 +1638,22 @@ class SharedClipBucketLoader:
             raise RuntimeError("Shared clip DataLoader yielded an empty batch")
 
         keys = {
-            (int(sample["metadata"]["clip_len"]), int(sample["metadata"]["frame_stride"]))
+            (
+                int(sample["metadata"]["clip_len"]),
+                int(sample["metadata"]["frame_stride"]),
+            )
             for sample in batch
         }
         if len(keys) != 1:
-            raise RuntimeError(f"Shared clip DataLoader mixed bucket keys in one batch: {sorted(keys)}")
+            raise RuntimeError(
+                f"Shared clip DataLoader mixed bucket keys in one batch: {sorted(keys)}"
+            )
         self.sampler.mark_consumed(self.sampler.world_size)
         self._batches_since_worker_restart += 1
         if (
             self.worker_restart_interval_batches
-            and self._batches_since_worker_restart == self.worker_restart_interval_batches
+            and self._batches_since_worker_restart
+            == self.worker_restart_interval_batches
         ):
             self._restart_workers()
         return keys.pop(), batch
@@ -1455,7 +1688,9 @@ def format_ego_video_dataloader_statistics(
 
     lines = [
         "***** Ego-Video DataLoader Statistics *****",
-        (f"  Sources = {len(sources)} | Buckets = {len(bucket_loaders.loaders)} | Sampling = {sampling}"),
+        (
+            f"  Sources = {len(sources)} | Buckets = {len(bucket_loaders.loaders)} | Sampling = {sampling}"
+        ),
         (
             f"  Workers/bucket/rank = {first_loader.num_workers} | "
             f"Max workers/rank = {first_loader.num_workers * len(bucket_loaders.loaders)} | "
@@ -1501,11 +1736,14 @@ def format_ego_video_dataloader_statistics(
         expected_samples_per_micro_step += bucket_probability * batch_size
         expected_frames_per_micro_step += bucket_probability * batch_size * length
         clip_summary = ", ".join(
-            f"{source.dataset_name}:{size:,}" for source, size in zip(loader.dataset.datasets, source_sizes, strict=True)
+            f"{source.dataset_name}:{size:,}"
+            for source, size in zip(loader.dataset.datasets, source_sizes, strict=True)
         )
         mix_summary = ", ".join(
             f"{source.dataset_name}:{probability:.1%}"
-            for source, probability in zip(loader.dataset.datasets, source_probabilities, strict=True)
+            for source, probability in zip(
+                loader.dataset.datasets, source_probabilities, strict=True
+            )
         )
         lines.append(
             f"  Bucket T={length}, stride={stride}: p={bucket_probability:.1%}, "
@@ -1524,7 +1762,9 @@ def format_ego_video_dataloader_statistics(
         f"frames={expected_frames_per_micro_step * effective_multiplier:.2f}"
     )
     if bucket_loaders.dropped_empty_buckets:
-        lines.append(f"  Dropped empty buckets = {list(bucket_loaders.dropped_empty_buckets)}")
+        lines.append(
+            f"  Dropped empty buckets = {list(bucket_loaders.dropped_empty_buckets)}"
+        )
     return "\n".join(lines)
 
 
@@ -1593,11 +1833,14 @@ def format_shared_ego_video_dataloader_statistics(
         expected_samples_per_micro_step += bucket_probability * batch_size
         expected_frames_per_micro_step += bucket_probability * batch_size * length
         clip_summary = ", ".join(
-            f"{source.dataset_name}:{size:,}" for source, size in zip(dataset.datasets, source_sizes, strict=True)
+            f"{source.dataset_name}:{size:,}"
+            for source, size in zip(dataset.datasets, source_sizes, strict=True)
         )
         mix_summary = ", ".join(
             f"{source.dataset_name}:{probability:.1%}"
-            for source, probability in zip(dataset.datasets, source_probabilities, strict=True)
+            for source, probability in zip(
+                dataset.datasets, source_probabilities, strict=True
+            )
         )
         lines.append(
             f"  Bucket T={length}, stride={stride}: p={bucket_probability:.1%}, "
@@ -1623,16 +1866,24 @@ def make_bucketed_ego_video_dataloaders(cfg: Any) -> UniformClipBucketLoaders:
     """Build one homogeneous loader for every configured ``(T, stride)`` pair."""
 
     data_cfg = _select_ego_video_cfg(cfg)
-    lengths = [int(value) for value in data_cfg.get("length_buckets", [4, 8, 12, 16, 24])]
+    lengths = [
+        int(value) for value in data_cfg.get("length_buckets", [4, 8, 12, 16, 24])
+    ]
     strides = [int(value) for value in data_cfg.get("stride_buckets", [1, 2, 4])]
-    length_probs = [float(value) for value in data_cfg.get("length_probs", [1.0] * len(lengths))]
-    stride_probs = [float(value) for value in data_cfg.get("stride_probs", [1.0] * len(strides))]
+    length_probs = [
+        float(value) for value in data_cfg.get("length_probs", [1.0] * len(lengths))
+    ]
+    stride_probs = [
+        float(value) for value in data_cfg.get("stride_probs", [1.0] * len(strides))
+    ]
     if len(length_probs) != len(lengths) or len(stride_probs) != len(strides):
         raise ValueError("length_probs/stride_probs must align with their bucket lists")
     frame_budget = int(data_cfg.get("per_device_frame_budget", 24))
     shuffle_block_size = int(data_cfg.get("shuffle_block_size", 262_144))
     if frame_budget < max(lengths):
-        raise ValueError(f"per_device_frame_budget={frame_budget} cannot fit the largest T bucket {max(lengths)}")
+        raise ValueError(
+            f"per_device_frame_budget={frame_budget} cannot fit the largest T bucket {max(lengths)}"
+        )
 
     base_cfg = OmegaConf.create(OmegaConf.to_container(cfg, resolve=False))
     base_data = _select_ego_video_cfg(base_cfg)
@@ -1645,10 +1896,18 @@ def make_bucketed_ego_video_dataloaders(cfg: Any) -> UniformClipBucketLoaders:
     if clip_sampling_mode not in {"sliding", "disjoint_window"}:
         raise ValueError(f"Unsupported clip_sampling_mode={clip_sampling_mode!r}")
     configured_window_span = data_cfg.get("unique_window_span", "auto")
-    required_window_span = max((length - 1) * stride + 1 for length, stride in bucket_keys)
-    window_span = required_window_span if configured_window_span == "auto" else int(configured_window_span)
+    required_window_span = max(
+        (length - 1) * stride + 1 for length, stride in bucket_keys
+    )
+    window_span = (
+        required_window_span
+        if configured_window_span == "auto"
+        else int(configured_window_span)
+    )
     if clip_sampling_mode == "disjoint_window" and window_span < required_window_span:
-        raise ValueError(f"unique_window_span={window_span} cannot fit maximum required span {required_window_span}")
+        raise ValueError(
+            f"unique_window_span={window_span} cannot fit maximum required span {required_window_span}"
+        )
 
     loaders: dict[tuple[int, int], DataLoader] = {}
     stateful_samplers: dict[tuple[int, int], Sampler] = {}
@@ -1696,7 +1955,9 @@ def make_bucketed_ego_video_dataloaders(cfg: Any) -> UniformClipBucketLoaders:
                 batch_size=batch_size,
                 temperature=float(data_cfg.get("dataset_temperature", 0.5)),
                 dataset_weights=(
-                    [float(value) for value in configured_weights] if configured_weights is not None else None
+                    [float(value) for value in configured_weights]
+                    if configured_weights is not None
+                    else None
                 ),
                 shuffle_block_size=shuffle_block_size,
                 seed=int(cfg.get("seed", 42)) + length * 101 + stride,
@@ -1712,7 +1973,9 @@ def make_bucketed_ego_video_dataloaders(cfg: Any) -> UniformClipBucketLoaders:
                 }
             )
         if num_workers > 0:
-            kwargs["persistent_workers"] = bool(data_cfg.get("persistent_workers", False))
+            kwargs["persistent_workers"] = bool(
+                data_cfg.get("persistent_workers", False)
+            )
             kwargs["prefetch_factor"] = int(data_cfg.get("prefetch_factor", 2))
         loaders[(length, stride)] = DataLoader(**kwargs)
 
@@ -1733,14 +1996,20 @@ def make_bucketed_ego_video_dataloaders(cfg: Any) -> UniformClipBucketLoaders:
     )
 
 
-def make_shared_bucketed_ego_video_dataloader(cfg: Any, *, world_size: int) -> SharedClipBucketLoader:
+def make_shared_bucketed_ego_video_dataloader(
+    cfg: Any, *, world_size: int
+) -> SharedClipBucketLoader:
     """Build one worker pool while retaining homogeneous bucket batches."""
 
     bucket_loaders = make_bucketed_ego_video_dataloaders(cfg)
     if set(bucket_loaders.loaders) != set(bucket_loaders.stateful_samplers):
-        raise ValueError("Shared bucket loading requires dataset_sampling=balanced or temperature")
+        raise ValueError(
+            "Shared bucket loading requires dataset_sampling=balanced or temperature"
+        )
 
-    bucket_datasets = {key: loader.dataset for key, loader in bucket_loaders.loaders.items()}
+    bucket_datasets = {
+        key: loader.dataset for key, loader in bucket_loaders.loaders.items()
+    }
     sampler = SharedBucketBatchSampler(
         bucket_loaders.stateful_samplers,
         bucket_loaders.bucket_probabilities,
@@ -1751,12 +2020,16 @@ def make_shared_bucketed_ego_video_dataloader(cfg: Any, *, world_size: int) -> S
 
     data_cfg = _select_ego_video_cfg(cfg)
     num_workers = int(data_cfg.get("num_workers", 0))
-    worker_restart_interval_batches = int(data_cfg.get("worker_restart_interval_batches", 0))
+    worker_restart_interval_batches = int(
+        data_cfg.get("worker_restart_interval_batches", 0)
+    )
     if worker_restart_interval_batches and num_workers == 0:
         raise ValueError("worker_restart_interval_batches requires num_workers > 0")
     persistent_workers = bool(data_cfg.get("persistent_workers", False))
     if worker_restart_interval_batches and not persistent_workers:
-        raise ValueError("worker_restart_interval_batches requires persistent_workers=true")
+        raise ValueError(
+            "worker_restart_interval_batches requires persistent_workers=true"
+        )
     kwargs = {
         "dataset": BucketedEgoVideoDataset(bucket_datasets),
         "batch_sampler": sampler,

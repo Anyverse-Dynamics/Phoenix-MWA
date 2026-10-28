@@ -44,7 +44,6 @@ from .vae_latent import (
     encode_vae_artifacts,
 )
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -659,9 +658,11 @@ def generate_vae_cache(
         (
             _UnifiedGenerationDataset(vae_source, vlm_source)
             if vae_source is not None and vlm_source is not None
-            else VaeLatentGenerationDataset(vae_source)
-            if vae_source is not None
-            else VlmLatentGenerationDataset(vlm_source)
+            else (
+                VaeLatentGenerationDataset(vae_source)
+                if vae_source is not None
+                else VlmLatentGenerationDataset(vlm_source)
+            )
         ),
         local_positions,
     )
