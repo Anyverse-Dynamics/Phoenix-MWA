@@ -355,3 +355,11 @@ NUM_GPUS_TOTAL=8 N_EPISODES=50 \
 This evaluates 24 GR1 tasks with a 720-step episode cap and 12 executed actions per replan. A saved scene-seed manifest fixes the episode layout protocol. Tensor shapes, action conventions and finite values are checked at runtime.
 
 Use a fresh runtime/output directory for each independent run. Runtime-generated configuration may contain resolved local paths and is excluded from source releases.
+
+## License
+
+Project-original code is available under the [MIT License](LICENSE),
+including commercial use. Preserve the copyright and permission notices.
+Bundled third-party components retain their own terms; see [NOTICE](NOTICE)
+and [LICENSES/](LICENSES/). Model weights, datasets and trademarks are
+covered by their respective terms.

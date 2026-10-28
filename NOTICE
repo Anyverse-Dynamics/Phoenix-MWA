@@ -1,17 +1,11 @@
 Phoenix-MWA licensing notice
 
-From the licensing update dated 2026-10-23, original material owned by or
-licensed for distribution by Anyverse Dynamics is offered under the
-Phoenix-MWA Academic Research License 1.0 in LICENSE, subject to the exclusions
-and prior grants described there. Commercial licensing inquiries:
-zhengyupeng18@mails.ucas.ac.cn.
-
-Before this update, the post-train branch at commit
-3a150db5abd8b064c63454a022d9d9a9e9e50712
-carried the MIT License. Its text and original attribution are preserved in
-LICENSES/Phoenix-MWA-legacy-MIT.txt. Earlier MIT grants remain available for
-the material they cover, including commercial-use permissions. This update
-does not retroactively restrict those grants or claim third-party ownership.
+As of 2026-10-28, project-original source code and documentation are
+available under the MIT License in LICENSE, including commercial use.
+Existing copyright notices and earlier license grants are preserved.
+Third-party components retain their own licenses; the project MIT grant
+does not relicense them. External weights, datasets, robot assets and
+trademarks remain subject to their respective terms.
 
 The institution logos in docs/assets/ were copied from the Phoenix project
 page (https://openphoenix-team.github.io/Phoenix-pages/). They identify
@@ -41,3 +35,18 @@ LIBERO-Plus and RoboCasa integration components retain their accompanying
 licenses and notices. External models, datasets, simulators and robot assets
 retain their own licenses. Retaining source attribution does not grant
 additional redistribution rights for model weights or datasets.
+
+Additional bundled-component notices
+------------------------------------
+
+- Original LIBERO code within third_party/LIBERO-plus/: retain the MIT
+  copyright and permission notice in LICENSES/LIBERO-MIT.txt.
+  https://github.com/Lifelong-Robot-Learning/LIBERO
+  LIBERO-Plus-specific modifications are separate upstream material; this
+  project does not grant an MIT license for those modifications. Their
+  redistribution terms must be confirmed with https://github.com/sylvestf/LIBERO-plus.
+- msgpack-numpy-derived serialization code in
+  third_party/robocasa_runner/deployment/model_server/tools/msgpack_numpy.py:
+  retain the BSD-3-Clause terms and Lev E. Givon copyright in
+  LICENSES/msgpack-numpy-BSD-3-Clause.md.
+  https://github.com/lebedov/msgpack-numpy

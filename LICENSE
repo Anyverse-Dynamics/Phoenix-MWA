@@ -1,100 +1,22 @@
-Phoenix-MWA Academic Research License 1.0
+MIT License
 
-Copyright (c) 2026 Anyverse Dynamics (无界动力).
+Copyright (c) 2026 OpenPhoenix team
+Copyright (c) 2026 Anyverse Dynamics
 
-1. Scope and ownership
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
 
-This license applies to the original Phoenix-MWA source code and documentation
-that Anyverse Dynamics owns or is authorized to license and distributes under
-this license (the "Materials"). Anyverse Dynamics is the "Licensor".
-Ownership is not transferred. Commercial licensing rights in the Materials
-owned by Anyverse Dynamics remain with Anyverse Dynamics. This statement does
-not assert ownership of third-party materials, independent contributions,
-research findings, or outputs merely produced using the Materials.
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
 
-2. Free academic permission
-
-The Licensor grants a worldwide, non-exclusive, royalty-free license to use,
-copy, study, reproduce, modify, and distribute the Materials and modifications
-for noncommercial academic research, teaching, learning, benchmarking,
-reproducibility, and the publication of research results. No separate request,
-registration, or payment is required for these permitted uses.
-
-Researchers may publish papers, results, and modified source code and share
-reproducibility artifacts under these terms. Employment by a company or receipt
-of industry funding does not by itself exclude a researcher; the actual use
-must be for noncommercial academic purposes, not commercial development or
-delivery of a commercial product or service.
-
-3. Commercial use
-
-This license does not grant permission for commercial use. Commercial use
-includes selling or licensing the Materials or modifications for commercial
-gain; incorporating them into commercial products, services, or hosted APIs;
-commercial robot deployment; and internal use to develop, evaluate, or improve
-a commercial product or service. Describing such activity as "research" does
-not make it a permitted academic use.
-
-Commercial use requires a separate written license from Anyverse Dynamics.
-Contact zhengyupeng18@mails.ucas.ac.cn to request commercial licensing.
-The commercial restriction does not override the independent permissions
-described in sections 5 and 6.
-
-4. Sharing and notices
-
-When sharing the Materials or modifications, include this license, retain
-applicable copyright and attribution notices, and clearly identify material
-changes. Distribute the covered Materials and modifications under these same
-academic-use terms, unless separately authorized in writing by the Licensor.
-Do not imply that a modified version is an official release or that the
-Licensor or a listed institution endorses your work. These obligations do not
-require a research paper or its independently authored text to use this license.
-
-5. Third-party code, models, data, and logos
-
-Third-party components retain their own licenses and notices, including those
-listed in NOTICE, LICENSES/, and component-specific files. Their original terms
-control their use. This license does not replace those terms or grant rights
-that the Licensor does not hold.
-
-Externally distributed model weights, datasets, robot assets, and other
-resources are governed by their own accompanying licenses. This repository
-license alone does not relicense them or their derivatives.
-
-Institution names and logos identify the organizations shown on the project
-page. They remain the property of their respective owners. No trademark
-license or right to claim endorsement is granted by this license.
-
-6. Previously released MIT versions
-
-Earlier versions of this repository were distributed under the MIT License.
-This license does not revoke, narrow, or retroactively replace permissions
-already granted for those versions, including their commercial-use permission.
-Recipients may continue to rely on those grants for the material they cover.
-The earlier MIT text and attribution are preserved in
-LICENSES/Phoenix-MWA-legacy-MIT.txt; the transition is documented in NOTICE.
-
-If material is independently available under an earlier MIT grant or another
-applicable license, this license does not remove that alternative. New original
-material first released only under this license is subject to this license.
-
-7. Termination
-
-Permission under this license terminates if you materially violate its terms.
-It is reinstated if you stop the violation and remedy it within 30 days after
-receiving written notice from the Licensor, unless the violation is repeated
-after an earlier reinstatement. Termination does not cancel permissions held
-independently under an earlier or third-party license.
-
-8. Disclaimer and liability
-
-The Materials are provided as available, without warranties of any kind,
-including fitness for a particular purpose, merchantability, noninfringement,
-accuracy, or safe operation of a physical robot. To the extent allowed by law,
-the Licensor and contributors are not liable for loss or damage arising from
-use or distribution of the Materials. You are responsible for testing and
-operating your applications safely. Nothing in this license excludes liability
-that cannot lawfully be excluded.
-
-This is a source-available academic research license with a commercial-use
-restriction, not an OSI-approved open-source license.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
