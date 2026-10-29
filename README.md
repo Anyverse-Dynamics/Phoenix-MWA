@@ -34,6 +34,14 @@
 | [`post-train`](https://github.com/Anyverse-Dynamics/Phoenix-MWA/tree/post-train) | Post-training for LIBERO, Bench2Dex, RoboTwin, RoboDojo, and RoboCasa |
 | [`encoder-pretrain`](https://github.com/Anyverse-Dynamics/Phoenix-MWA/tree/encoder-pretrain) | Phoenix Encoder & CS-VAE pretraining code |
 
+## Pretrained Weights
+
+| Component | Checkpoint | Download |
+| --- | --- | --- |
+| Phoenix-MWA pretrained model | [`pretrain_256013.pt`](https://huggingface.co/AnyverseDynamics/Phoenix-Pretrain/blob/main/pretrain_256013.pt) | [Download](https://huggingface.co/AnyverseDynamics/Phoenix-Pretrain/resolve/main/pretrain_256013.pt?download=true) |
+| Phoenix Encoder | [`dino110k.pt`](https://huggingface.co/AnyverseDynamics/Phoenix-Encoders/blob/main/dino110k.pt) | [Download](https://huggingface.co/AnyverseDynamics/Phoenix-Encoders/resolve/main/dino110k.pt?download=true) |
+| CS-VAE | [`csvae.pt`](https://huggingface.co/AnyverseDynamics/Phoenix-Encoders/blob/main/csvae.pt) | [Download](https://huggingface.co/AnyverseDynamics/Phoenix-Encoders/resolve/main/csvae.pt?download=true) |
+
 ## Overview
 
 ![Phoenix-MWA architecture](docs/assets/main.png)
