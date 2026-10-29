@@ -25,12 +25,14 @@
   <a href="docs/RESOURCES.md">Resources</a>
 </p>
 
-This is the **main branch of Phoenix-MWA**, providing the **world–action pretraining code**. Other components are organized into dedicated branches:
+## Branch Guide
 
-- **Post-training & benchmark evaluation:** See the [post-train branch](https://github.com/OpenPhoenix-Team/Phoenix-MWA/tree/post-train).
-- **Encoder pretraining (dual-teacher distillation & CS-VAE training):** See the `encoder` branch *(coming soon)*.
-- **Data processing pipeline:** See the `data` branch *(coming soon)*.
-- **Real-world RTC training & asynchronous inference deployment:** See the `rtc` branch *(coming soon)*.
+| Branch | Contents |
+| --- | --- |
+| [`main`](https://github.com/Anyverse-Dynamics/Phoenix-MWA/tree/main) | Open-source plan & pretraining code |
+| [`prometheus`](https://github.com/Anyverse-Dynamics/Phoenix-MWA/tree/prometheus) | Data collection & real-world deployment (RTC training & inference) |
+| [`post-train`](https://github.com/Anyverse-Dynamics/Phoenix-MWA/tree/post-train) | Post-training for LIBERO, Bench2Dex, RoboTwin, RoboDojo, and RoboCasa |
+| [`encoder-pretrain`](https://github.com/Anyverse-Dynamics/Phoenix-MWA/tree/encoder-pretrain) | Phoenix Encoder & CS-VAE pretraining code |
 
 ## Overview
 
