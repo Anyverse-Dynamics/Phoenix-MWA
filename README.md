@@ -15,7 +15,7 @@
 
 <p align="center">
   <a href="https://openphoenix-team.github.io/Phoenix-pages/"><img src="https://img.shields.io/badge/Project%20Page-Blog post-blue?style=flat&amp;logo=github" alt="Project Page"></a>
-  <a href="https://huggingface.co/collections/OpenPhoenix/phoenix-mwa"><img src="https://img.shields.io/badge/HuggingFace-Model%20%26%20Data-orange?style=flat&amp;logo=huggingface" alt="Model &amp; Data on Hugging Face"></a>
+  <a href="https://huggingface.co/AnyverseDynamics"><img src="https://img.shields.io/badge/HuggingFace-Model%20%26%20Data-orange?style=flat&amp;logo=huggingface" alt="Model &amp; Data on Hugging Face"></a>
 </p>
 
 <p align="center">
