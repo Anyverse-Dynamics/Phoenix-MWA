@@ -169,11 +169,13 @@ remain subject to their respective licenses.
 
 ## Contact
 
-Welcome to join us to share experimental results, ask questions, and exchange different viewpoints:
+Join **Phoenix 开源交流 2 群** (Phoenix Open-Source Discussion Group 2) to share experimental results, ask questions, and exchange ideas.
 
 <p align="center">
-  <img src="docs/assets/wechat-group-qr.jpg" alt="MWA-Phoenix WeChat group QR code" width="420">
+  <img src="docs/assets/wechat-group-qr-20261112.jpg" alt="Phoenix 开源交流 2 群 WeChat QR code" width="420">
 </p>
+
+QR code updated on November 12, 2026; valid before November 19, 2026.
 
 ## License
 
