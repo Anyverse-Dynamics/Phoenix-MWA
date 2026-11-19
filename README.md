@@ -11,11 +11,11 @@
   <img src="docs/assets/phoenix-mwa-title.png" alt="Phoenix-MWA" width="600">
 </p>
 
-<p align="center"><strong>Learning Generalizable World–Action Models<br>with Structural and Semantic Representations</strong></p>
+<p align="center"><strong>Phoenix: Learning Scene Structure Representations<br>for Generalizable World-Action Models</strong></p>
 
 <p align="center">
   <a href="https://arxiv.org/pdf/2611.24938"><img src="https://img.shields.io/badge/arXiv-2611.24938-b31b1b?style=flat" alt="Phoenix-MWA Paper"></a>
-  <a href="https://openphoenix-team.github.io/Phoenix-pages/"><img src="https://img.shields.io/badge/Project%20Page-Blog post-blue?style=flat&amp;logo=github" alt="Project Page"></a>
+  <a href="https://openphoenix-team.github.io/Phoenix-pages/"><img src="https://img.shields.io/badge/Project%20Page-Phoenix-blue?style=flat&amp;logo=github" alt="Project Page"></a>
   <a href="https://huggingface.co/AnyverseDynamics"><img src="https://img.shields.io/badge/HuggingFace-Model%20%26%20Data-orange?style=flat&amp;logo=huggingface" alt="Model &amp; Data on Hugging Face"></a>
 </p>
 
@@ -167,6 +167,24 @@ Phoenix builds on FastWAM, Wan, StarVLA, DINOv3 and LeRobot.
 Source attribution is retained in [NOTICE](NOTICE), [LICENSE](LICENSE),
 [`LICENSES/`](LICENSES/) and the bundled vendor tree. Model weights and datasets
 remain subject to their respective licenses.
+
+## Citation
+
+If you use Phoenix in your research, please cite the paper:
+
+```bibtex
+@misc{zheng2026phoenixlearningscenestructure,
+      title={Phoenix: Learning Scene Structure Representations for Generalizable World-Action Models},
+      author={Yupeng Zheng and Chaoyue Li and Linbo Wang and Xiang Li and Yuhang Zheng and Xiaotong Su and Songen Gu and Yichen Zhang and Zebin Xing and Shuai Tian and Jingxiang Guo and Jing Li and Zhiyong Zhao and Zhongpu Xia and Qichao Zhang and Haoran Li and Shuicheng Yan and Dongbin Zhao},
+      year={2026},
+      eprint={2611.24938},
+      archivePrefix={arXiv},
+      primaryClass={cs.RO},
+      url={https://arxiv.org/abs/2611.24938},
+}
+```
+
+[Download BibTeX](citation.bib) · [Paper](https://arxiv.org/abs/2611.24938)
 
 ## Contact
 
