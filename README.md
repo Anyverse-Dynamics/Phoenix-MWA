@@ -14,6 +14,7 @@
 <p align="center"><strong>Learning Generalizable World–Action Models<br>with Structural and Semantic Representations</strong></p>
 
 <p align="center">
+  <a href="https://arxiv.org/pdf/2611.24938"><img src="https://img.shields.io/badge/arXiv-2611.24938-b31b1b?style=flat" alt="Phoenix-MWA Paper"></a>
   <a href="https://openphoenix-team.github.io/Phoenix-pages/"><img src="https://img.shields.io/badge/Project%20Page-Blog post-blue?style=flat&amp;logo=github" alt="Project Page"></a>
   <a href="https://huggingface.co/AnyverseDynamics"><img src="https://img.shields.io/badge/HuggingFace-Model%20%26%20Data-orange?style=flat&amp;logo=huggingface" alt="Model &amp; Data on Hugging Face"></a>
 </p>
